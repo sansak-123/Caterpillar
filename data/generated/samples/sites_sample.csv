@@ -1,0 +1,4 @@
+site_id,name,lat,lon,terrain_type,soil_type,climate_profile,elevation_m,soil_bearing_capacity,site_area_hectares,timezone
+SITE01,Riverside Metro Expansion,19.076,72.8777,flat_urban,clay,tropical_monsoon,7,100,53.0,Asia/Kolkata
+SITE02,Highway 44 Cutting,17.385,78.4867,rolling_hills,laterite,semi_arid,374,180,18.3,Asia/Kolkata
+SITE03,Coastal Logistics Yard,13.0827,80.2707,flat_coastal,sandy_loam,coastal_humid,191,140,24.2,Asia/Kolkata

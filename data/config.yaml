@@ -10,6 +10,7 @@ fleet:
   num_sites: 3
 
 days: 90
+start_date: "2025-03-17"
 demo_day: "2025-05-01"
 
 personas:

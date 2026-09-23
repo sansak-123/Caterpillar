@@ -1,0 +1,16 @@
+ts,site_id,temp_c,precip_mm,wind_kmh,visibility_m,humidity_pct,barometric_pressure_hpa,uv_index,dust_index,ground_moisture_pct,freeze_thaw_flag,daylight_flag,condition,monsoon_phase
+2025-03-17 00:00:00,SITE01,24.9,0.0,12.0,8594.0,43.0,1013.1,0.0,36.0,25.0,False,False,Sunny,pre_monsoon
+2025-03-17 01:00:00,SITE01,25.8,0.0,15.8,8780.0,47.0,1011.4,0.1,28.0,24.6,False,False,Sunny,pre_monsoon
+2025-03-17 02:00:00,SITE01,24.4,0.0,17.3,8255.0,56.0,1012.6,0.0,38.0,24.3,False,False,Sunny,pre_monsoon
+2025-03-17 03:00:00,SITE01,24.4,0.0,10.7,9172.0,55.0,1010.5,0.2,20.0,23.9,False,False,Sunny,pre_monsoon
+2025-03-17 04:00:00,SITE01,24.1,0.0,11.2,8641.0,57.0,1009.3,0.0,25.0,23.5,False,False,Sunny,pre_monsoon
+2025-03-17 05:00:00,SITE01,26.5,0.0,11.7,7802.0,62.0,1008.2,0.0,38.0,23.2,False,False,Sunny,pre_monsoon
+2025-03-17 06:00:00,SITE01,24.6,0.0,10.1,8820.0,57.0,1011.4,0.0,35.0,22.8,False,True,Sunny,pre_monsoon
+2025-03-17 07:00:00,SITE01,27.2,0.0,7.2,8526.0,58.0,1009.7,2.0,40.0,22.5,False,True,Sunny,pre_monsoon
+2025-03-17 08:00:00,SITE01,27.0,0.0,4.9,8543.0,48.0,1013.2,4.5,41.0,22.2,False,True,Sunny,pre_monsoon
+2025-03-17 09:00:00,SITE01,29.0,0.0,2.1,9012.0,52.0,1010.4,5.6,33.0,21.8,False,True,Sunny,pre_monsoon
+2025-03-17 10:00:00,SITE01,30.8,0.0,2.8,8405.0,53.0,1012.9,7.1,39.0,21.5,False,True,Sunny,pre_monsoon
+2025-03-17 11:00:00,SITE01,31.9,0.0,1.8,8251.0,67.0,1009.7,7.9,44.0,21.2,False,True,Sunny,pre_monsoon
+2025-03-17 12:00:00,SITE01,31.7,0.0,3.0,8250.0,55.0,1008.8,7.8,48.0,20.9,False,True,Sunny,pre_monsoon
+2025-03-17 13:00:00,SITE01,33.9,0.0,6.7,8917.0,62.0,1011.2,7.5,34.0,20.5,False,True,Sunny,pre_monsoon
+2025-03-17 14:00:00,SITE01,32.2,0.0,8.7,8794.0,66.0,1013.3,6.6,34.0,20.2,False,True,Sunny,pre_monsoon

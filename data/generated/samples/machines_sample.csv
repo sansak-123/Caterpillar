@@ -1,0 +1,13 @@
+machine_id,class,model_size_t,engine_power_kw,bucket_capacity_m3,undercarriage_type,age_yrs,purchase_year,idle_lph,work_lph,fuel_tank_capacity_l,blind_spot_profile,gps_enabled,last_service_date,service_interval_hrs,hours_since_last_service,fault_code_history_count,avg_daily_utilization_hrs
+EXC001,excavator,18.1,195,0.97,track,2,2023,3.62,15.67,484,rear_swing_blind,True,2025-05-17,250,235.7,0,7.6
+EXC002,excavator,44.8,160,1.81,track,7,2018,4.28,20.69,453,rear_swing_blind,True,2025-05-14,250,262.9,4,8.0
+EXC003,excavator,31.0,92,1.08,track,3,2022,4.77,18.51,526,rear_swing_blind,True,2025-06-01,250,119.4,1,8.6
+EXC004,excavator,19.8,147,2.49,track,6,2019,4.3,16.2,437,rear_swing_blind,True,2025-05-29,500,138.6,11,5.1
+EXC005,excavator,26.2,103,1.67,track,2,2023,3.1,14.35,343,rear_swing_blind,True,2025-05-16,250,245.4,2,5.6
+EXC006,excavator,37.6,205,2.37,track,6,2019,4.6,20.62,323,rear_swing_blind,True,2025-06-09,250,49.2,1,7.7
+WLD001,wheel_loader,17.3,113,2.68,wheel,1,2024,3.02,17.54,391,front_bucket_blind,True,2025-06-04,250,95.4,3,5.7
+WLD002,wheel_loader,29.6,129,2.4,wheel,6,2019,4.82,26.88,362,front_bucket_blind,False,2025-04-19,500,456.6,1,8.8
+WLD003,wheel_loader,28.0,114,3.84,wheel,6,2019,4.51,18.52,556,front_bucket_blind,True,2025-05-03,500,346.9,11,7.4
+WLD004,wheel_loader,18.1,140,2.57,wheel,4,2021,3.23,11.25,466,front_bucket_blind,True,2025-06-10,500,45.5,4,5.1
+DZR001,dozer,30.1,114,0.0,track,2,2023,3.91,21.17,429,rear_wide_blind,True,2025-04-25,500,411.3,1,8.1
+DZR002,dozer,29.7,142,0.0,track,7,2018,3.83,21.26,461,rear_wide_blind,True,2025-06-08,250,56.1,2,8.9

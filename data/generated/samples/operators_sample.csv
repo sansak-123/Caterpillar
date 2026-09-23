@@ -1,0 +1,16 @@
+operator_id,skill,years_exp,persona,language,shift,shift_number,certification_level,certification_expiry_days,hours_on_this_machine_model,hours_total_career,preferred_control_pattern,incident_history_count,training_completion_pct,ghost_skill_factor
+OP1001,Intermediate,4.5,belt_skipper,hi,day,2,Standard,193,1512,8825,SAE,1,39.0,0.797
+OP1002,Expert,18.1,disciplined,ta,day,1,Advanced,587,1401,30911,SAE,0,21.0,0.942
+OP1003,Intermediate,2.9,belt_skipper,en,night,1,Standard,683,588,4108,SAE,1,29.0,0.744
+OP1004,Beginner,0.6,belt_skipper,ta,day,2,Standard,633,1150,911,SAE,0,22.0,0.457
+OP1005,Intermediate,2.3,belt_skipper,en,day,2,Standard,532,4700,3569,ISO,1,86.0,0.744
+OP1006,Beginner,1.4,disciplined,ta,day,2,Standard,42,1572,2550,ISO,1,48.0,0.424
+OP1007,Intermediate,3.2,belt_skipper,en,night,1,Standard,681,3614,5963,ISO,1,75.0,0.617
+OP1008,Beginner,0.7,belt_skipper,ta,day,2,Standard,414,5815,1328,SAE,2,47.0,0.492
+OP1009,Intermediate,2.3,rusher,hi,day,2,Standard,138,5850,3564,SAE,0,72.0,0.667
+OP1010,Intermediate,3.5,disciplined,hi,day,1,Standard,473,4919,4987,SAE,1,75.0,0.649
+OP1011,Beginner,0.3,rusher,hi,day,1,Standard,34,2052,532,ISO,1,77.0,0.407
+OP1012,Intermediate,5.9,disciplined,en,day,2,Standard,98,1224,9838,SAE,1,93.0,0.711
+OP1013,Beginner,0.9,learner,hi,day,2,Standard,30,1469,1327,SAE,2,67.0,0.364
+OP1014,Beginner,1.7,belt_skipper,en,night,2,Standard,666,1452,3188,SAE,1,55.0,0.513
+OP1015,Expert,10.7,disciplined,ta,day,2,Advanced,553,4838,18839,SAE,1,77.0,0.941
