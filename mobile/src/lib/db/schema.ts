@@ -108,8 +108,10 @@ CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status);
 
 CREATE TABLE IF NOT EXISTS model_bundles (
   version TEXT PRIMARY KEY NOT NULL,
-  file_name TEXT NOT NULL,
-  local_uri TEXT NOT NULL,
+  p50_local_uri TEXT NOT NULL,
+  p90_local_uri TEXT NOT NULL,
+  feature_schema_json TEXT NOT NULL,
+  thresholds_json TEXT NOT NULL,
   downloaded_at TEXT NOT NULL,
   is_current INTEGER NOT NULL DEFAULT 0
 );
@@ -177,4 +179,14 @@ export type LocalTaskRow = {
   version: number;
   conflict: number;
   updated_at: string;
+};
+
+export type LocalModelBundleRow = {
+  version: string;
+  p50_local_uri: string;
+  p90_local_uri: string;
+  feature_schema_json: string;
+  thresholds_json: string;
+  downloaded_at: string;
+  is_current: number;
 };

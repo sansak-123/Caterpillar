@@ -3,6 +3,7 @@ import { AppState, Platform } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 
 import { fetchSyncPull, pushSyncEvents, type SyncEvent as ApiSyncEvent } from "../api/client";
+import { ensureModelBundleDownloaded } from "../assets/downloadManager";
 import { getDatabase } from "../db/database";
 import { useAuthStore } from "../../store/auth";
 import { useConnectivityStore } from "../../store/connectivity";
@@ -17,9 +18,26 @@ import {
 
 const FOREGROUND_RETRY_MS = 30_000; // CLAUDE.md §3.1: "a 30 s retry loop ... while foregrounded"
 const MAX_BACKOFF_MS = 5 * 60_000; // "exponential backoff (max 5 min)"
+const TICK_TIMEOUT_MS = 15_000; // a stuck DB/network call must never wedge the engine forever
 
 function backoffDelayMs(consecutiveFailures: number): number {
   return Math.min(FOREGROUND_RETRY_MS * 2 ** Math.max(0, consecutiveFailures), MAX_BACKOFF_MS);
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
 }
 
 /** Pushes every pending outbox row to /sync/push, batched (server already caps at 500
@@ -56,6 +74,18 @@ export async function drainOutbox(token: string): Promise<{ attempted: number; a
 export async function pullFromServer(token: string): Promise<void> {
   const cursor = await getSyncCursor();
   const result = await fetchSyncPull(token, cursor);
+
+  if (result.model_bundle) {
+    try {
+      await ensureModelBundleDownloaded(token, result.model_bundle);
+    } catch (err) {
+      // Best-effort — lib/onnx keeps using whatever bundle (if any) is already local.
+      // Logged (not silently swallowed) since a persistently failing download is worth
+      // noticing during development, even though it must never block the sync cycle.
+      console.warn("[sync] model bundle download failed:", err);
+    }
+  }
+
   const db = await getDatabase();
   for (const t of result.tasks) {
     await db.runAsync(
@@ -115,6 +145,36 @@ export function useSyncEngine(): void {
   const failureCount = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
+  const pendingRetryRef = useRef(false);
+
+  // Read fresh from refs inside the one long-lived tick loop below, instead of
+  // closing over `token`/`devNetworkCut` from whichever render mounted it.
+  //
+  // This fixes a real, confirmed bug (caught live: /auth/login and /tasks/today both
+  // fired correctly after login, but /sync/pull never fired, ever). Root cause: the
+  // old code re-ran the whole effect — tick, listeners, and all — every time
+  // token/devNetworkCut changed, but `inFlightRef` is a ref, shared across every
+  // re-run. The very first tick (mounted with token=null) was still awaiting a slow
+  // on-device SQLite read when login resolved a couple seconds later; the new
+  // effect's tick() call landed while that guard was still held and silently bailed
+  // out (the early-return happens before the try/finally, so nothing gets
+  // scheduled). When the stale tick finally finished, it reset the guard but then
+  // called ITS OWN scheduleNext(), which checked ITS OWN generation's `cancelled`
+  // flag — already true, since the effect had already been torn down and re-created
+  // — so it no-opped too. Nothing was left to ever call tick() again. Keeping a
+  // single generation for the whole component lifetime removes the "which
+  // generation's closure is this" mismatch entirely.
+  const tokenRef = useRef(token);
+  const devNetworkCutRef = useRef(devNetworkCut);
+  const tickRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    tokenRef.current = token;
+    devNetworkCutRef.current = devNetworkCut;
+    // Nudge immediately rather than waiting for the 30s timer — this is what makes a
+    // fresh login or a dev "cut network" toggle take effect right away.
+    tickRef.current();
+  }, [token, devNetworkCut]);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,50 +185,73 @@ export function useSyncEngine(): void {
     }
 
     async function tick() {
-      // The retry timer, the NetInfo listener, and the AppState listener can all try
-      // to fire around the same reconnect moment — without this guard, two overlapping
-      // ticks would each read the same still-pending outbox rows and push the same
-      // event_id twice concurrently (a real race this caught: see the SAVEPOINT fix in
-      // backend/app/api/sync.py).
-      if (cancelled || inFlightRef.current) return;
+      if (cancelled) return;
+      if (inFlightRef.current) {
+        // Something changed (token, connectivity) while a tick was already running —
+        // don't drop it, run once more as soon as the current one finishes instead of
+        // waiting out the full retry delay.
+        pendingRetryRef.current = true;
+        return;
+      }
       inFlightRef.current = true;
       try {
-        await refreshQueuedCount();
-        if (devNetworkCut || !token) {
-          setStatus(devNetworkCut ? "offline" : "online");
+        try {
+          await withTimeout(refreshQueuedCount(), TICK_TIMEOUT_MS, "refreshQueuedCount");
+        } catch (err) {
+          console.warn("[sync] refreshQueuedCount failed/timed out:", err);
+        }
+        const currentToken = tokenRef.current;
+        const currentDevNetworkCut = devNetworkCutRef.current;
+        if (currentDevNetworkCut || !currentToken) {
+          setStatus(currentDevNetworkCut ? "offline" : "online");
           return;
         }
         setStatus("syncing");
         try {
-          const clean = await runSyncCycle(token);
+          const clean = await withTimeout(runSyncCycle(currentToken), TICK_TIMEOUT_MS, "runSyncCycle");
           if (!cancelled) {
-            await refreshQueuedCount();
+            await withTimeout(refreshQueuedCount(), TICK_TIMEOUT_MS, "refreshQueuedCount").catch(() => {});
             setStatus("online");
             markSynced();
             failureCount.current = clean ? 0 : failureCount.current + 1;
           }
-        } catch {
+        } catch (err) {
           if (!cancelled) {
             setStatus("offline");
             failureCount.current += 1;
           }
+          // A sync cycle failing (or a stuck DB/network call timing out) shouldn't be a
+          // silent mystery — surfaced here rather than thrown, so it never wedges the
+          // retry loop itself, just gets logged for dev visibility.
+          console.warn("[sync] cycle failed:", err);
         }
       } finally {
+        // However the above played out — success, failure, or a timeout — this MUST
+        // run, or every future tick silently no-ops forever against the guard above.
+        // This is what a genuinely stuck DB/network call used to do before the
+        // timeouts existed.
         inFlightRef.current = false;
-        scheduleNext();
+        if (pendingRetryRef.current) {
+          pendingRetryRef.current = false;
+          tick();
+        } else {
+          scheduleNext();
+        }
       }
     }
 
     function scheduleNext() {
       if (cancelled) return;
+      if (timerRef.current) clearTimeout(timerRef.current);
       const delay = failureCount.current > 0 ? backoffDelayMs(failureCount.current) : FOREGROUND_RETRY_MS;
       timerRef.current = setTimeout(tick, delay);
     }
 
+    tickRef.current = tick;
     tick();
 
     const netInfoUnsubscribe = NetInfo.addEventListener((state) => {
-      if (state.isConnected && !devNetworkCut) {
+      if (state.isConnected && !devNetworkCutRef.current) {
         // Connectivity just came back — don't wait for the backoff timer.
         if (timerRef.current) clearTimeout(timerRef.current);
         failureCount.current = 0;
@@ -189,8 +272,10 @@ export function useSyncEngine(): void {
       netInfoUnsubscribe();
       appStateSubscription.remove();
     };
+    // Intentionally mounted once — see the comment above the ref-syncing effect for
+    // why this must NOT depend on token/devNetworkCut.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, devNetworkCut]);
+  }, []);
 
   useEffect(() => {
     if (Platform.OS === "web") return; // TaskManager is unconditionally unavailable on web

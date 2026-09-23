@@ -1,0 +1,15 @@
+{
+  "idle_ratio_alert_threshold": 0.6,
+  "idle_min_fallback_threshold": 45,
+  "seatbelt_soft_reminder_idle": true,
+  "proximity_base_radius_m": {
+    "excavator": 12.0,
+    "wheel_loader": 10.0,
+    "dozer": 14.0
+  },
+  "proximity_rear_sector_multiplier": 1.5,
+  "proximity_swing_reverse_state_multiplier": 1.3,
+  "anomaly_isolation_forest_contamination": 0.05,
+  "anomaly_zscore_strong_outlier": 1.5,
+  "near_miss_gap_seconds": 120
+}

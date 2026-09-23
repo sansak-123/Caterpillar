@@ -1,0 +1,6 @@
+{
+  "version": "v20260923194202",
+  "task_time_p50_uri": "bundles/v20260923194202/task_time_p50.onnx",
+  "task_time_p90_uri": "bundles/v20260923194202/task_time_p90.onnx",
+  "published_at": "2026-09-23T19:42:02.533327"
+}

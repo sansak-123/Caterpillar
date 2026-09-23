@@ -19,6 +19,7 @@ import { ScreenBackground } from "../components/ScreenBackground";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { PRE_START_CHECKLIST } from "../content/preStartChecklist";
 import { fetchTasksToday, type ApiTask } from "../lib/api/client";
+import { estimateTaskTimeOffline } from "../lib/onnx/taskTimeModel";
 import { appendToOutbox } from "../lib/sync/outbox";
 import { useAuthStore } from "../store/auth";
 import { useChecklistStore } from "../store/checklist";
@@ -34,6 +35,7 @@ type Task = {
   depth: string;
   p50Min: number;
   p90Min: number;
+  estMin: number;
   weather: string;
   risk: "safe" | "caution" | "danger";
   status: TaskStatus;
@@ -52,6 +54,7 @@ const mockTasks: Task[] = [
     depth: "1.8 m",
     p50Min: 58,
     p90Min: 71,
+    estMin: 60, // tasks_seed.csv T001
     weather: "Sunny",
     risk: "safe",
     status: "in_progress",
@@ -64,6 +67,7 @@ const mockTasks: Task[] = [
     depth: "1.2 m",
     p50Min: 52,
     p90Min: 66,
+    estMin: 45, // tasks_seed.csv T002
     weather: "Rainy",
     risk: "caution",
     status: "pending",
@@ -76,6 +80,7 @@ const mockTasks: Task[] = [
     depth: "—",
     p50Min: 42,
     p90Min: 55,
+    estMin: 30, // tasks_seed.csv T003
     weather: "Cloudy",
     risk: "caution",
     status: "pending",
@@ -88,6 +93,7 @@ const mockTasks: Task[] = [
     depth: "—",
     p50Min: 105,
     p90Min: 128,
+    estMin: 90, // tasks_seed.csv T005
     weather: "Windy",
     risk: "danger",
     status: "pending",
@@ -111,6 +117,7 @@ function mapApiTask(t: ApiTask): Task {
     depth: "—",
     p50Min: t.p50_min ?? t.est_min,
     p90Min: t.p90_min ?? t.est_min,
+    estMin: t.est_min,
     weather: t.weather_condition ?? "Unknown",
     risk,
     status,
@@ -134,12 +141,14 @@ function TaskBody({
   onStart,
   onPause,
   onComplete,
+  offlineEstimate,
 }: {
   task: Task;
   colors: ReturnType<typeof useColors>;
   onStart: () => void;
   onPause: () => void;
   onComplete: () => void;
+  offlineEstimate?: { p50: number; p90: number } | null;
 }) {
   return (
     <>
@@ -182,6 +191,17 @@ function TaskBody({
         <Text style={{ color: colors.textMuted }}>–{task.p90Min} min (P50–P90)</Text>
       </Text>
 
+      {offlineEstimate ? (
+        // CLAUDE.md §3.1: offline re-scoring uses the on-device ONNX model and must be
+        // marked "approximate (offline)" — never presented as equivalent to the
+        // server's fully-informed, SHAP-explained estimate from morning sync.
+        <Text style={[type.caption, { fontStyle: "italic" }]}>
+          <Text style={{ color: colors.textMuted }}>~Re-scored offline: </Text>
+          <Text style={{ color: colors.textSecondary, fontWeight: "700" }}>{offlineEstimate.p50}</Text>
+          <Text style={{ color: colors.textMuted }}>–{offlineEstimate.p90} min (approximate)</Text>
+        </Text>
+      ) : null}
+
       <View style={styles.actionsRow}>
         {task.status === "in_progress" ? (
           <>
@@ -203,6 +223,7 @@ export function TodayScreen() {
   const token = useAuthStore((s) => s.token);
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [isLive, setIsLive] = useState(false);
+  const [offlineEstimates, setOfflineEstimates] = useState<Record<string, { p50: number; p90: number }>>({});
 
   // Session bootstrap and connectivity status/queued-count are owned by the root
   // layout's useSyncEngine() now (CLAUDE.md §3.1) — this effect only reacts to a token
@@ -226,6 +247,41 @@ export function TodayScreen() {
       cancelled = true;
     };
   }, [token, devNetworkCut]);
+
+  // CLAUDE.md §3.1: "offline re-scoring uses ONNX and marks explanation 'approximate
+  // (offline)'." The dev "cut network" toggle is the demoable stand-in for genuinely
+  // losing connectivity (USP-5: safety/estimates never wait on the network) — when it's
+  // on, re-score every non-done task on-device from whatever model bundle was already
+  // downloaded, entirely locally, no network call involved.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!devNetworkCut) {
+        if (!cancelled) setOfflineEstimates({});
+        return;
+      }
+      const now = new Date();
+      const entries = await Promise.all(
+        tasks
+          .filter((t) => t.status !== "done")
+          .map(async (t) => {
+            const result = await estimateTaskTimeOffline(t.estMin, {
+              task_type: t.title.split(" — ")[0],
+              weather: t.weather,
+              hour_of_day: now.getHours(),
+              day_of_week: now.getDay(),
+            });
+            return result ? ([t.id, { p50: result.value, p90: result.range[1] }] as const) : null;
+          })
+      );
+      if (!cancelled) {
+        setOfflineEstimates(Object.fromEntries(entries.filter((e): e is readonly [string, { p50: number; p90: number }] => e !== null)));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [devNetworkCut, tasks]);
 
   // Optimistic local update + a real outbox write (CLAUDE.md §3.1 outbox pattern) —
   // this succeeds instantly offline; useSyncEngine drains it to /sync/push whenever
@@ -328,6 +384,7 @@ export function TodayScreen() {
                   onStart={() => changeTaskStatus(inProgress, "in_progress")}
                   onPause={() => changeTaskStatus(inProgress, "pending")}
                   onComplete={() => changeTaskStatus(inProgress, "done")}
+                  offlineEstimate={offlineEstimates[inProgress.id]}
                 />
               </GlassCard>
             </Animated.View>
@@ -344,6 +401,7 @@ export function TodayScreen() {
                     onStart={() => changeTaskStatus(task, "in_progress")}
                     onPause={() => changeTaskStatus(task, "pending")}
                     onComplete={() => changeTaskStatus(task, "done")}
+                    offlineEstimate={offlineEstimates[task.id]}
                   />
                 </Card>
               </Animated.View>

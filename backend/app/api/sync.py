@@ -104,7 +104,16 @@ async def pull(
         bookings=[],  # populated once Phase 6 booking flows exist
         training_assignments=[],  # populated once Phase 6 assignment flows exist
         model_bundle=(
-            {"version": bundle.version, "published_at": bundle.published_at.isoformat()}
+            {
+                "version": bundle.version,
+                "published_at": bundle.published_at.isoformat(),
+                # The device never sees a raw filesystem path — just a version and a
+                # fixed artifact name — see /model-bundles/{version}/files/{artifact}.
+                "task_time_p50_url": f"/model-bundles/{bundle.version}/files/p50",
+                "task_time_p90_url": f"/model-bundles/{bundle.version}/files/p90",
+                "feature_schema": json.loads(bundle.feature_schema_json),
+                "thresholds": json.loads(bundle.thresholds_json),
+            }
             if bundle
             else None
         ),

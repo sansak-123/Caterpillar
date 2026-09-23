@@ -1,11 +1,11 @@
 /**
  * Thin fetch wrapper against the real FastAPI backend — CLAUDE.md section 3. This is
- * the "online" half of the offline-first contract; lib/sync (not yet built) will add
- * the outbox/retry machinery on top for Phase 4's full offline-first scope. For now
- * this proves the mobile app really talks to the real API rather than mock data only.
+ * the "online" half of the offline-first contract; lib/sync's outbox/engine sits on top
+ * of these functions for Phase 4's offline-first scope (queueing writes, draining them
+ * here when there's a connection).
  */
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 const DEMO_USERNAME = "demo_op1001";
 const DEMO_PASSWORD = "demo12345";
 const DEMO_OPERATOR_ID = "OP1001";
@@ -236,12 +236,21 @@ export type SyncPullTask = {
   conflict: boolean;
 };
 
+export type SyncPullModelBundle = {
+  version: string;
+  published_at: string;
+  task_time_p50_url: string;
+  task_time_p90_url: string;
+  feature_schema: unknown;
+  thresholds: unknown;
+};
+
 export type SyncPullResponse = {
   cursor: string;
   tasks: SyncPullTask[];
   bookings: unknown[];
   training_assignments: unknown[];
-  model_bundle: { version: string; published_at: string } | null;
+  model_bundle: SyncPullModelBundle | null;
 };
 
 export async function fetchSyncPull(token: string, since: string | null): Promise<SyncPullResponse> {
