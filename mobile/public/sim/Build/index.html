@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SiteSafety</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #2a2d30; overflow: hidden; }
+    #unity-canvas { width: 100%; height: 100%; display: block; outline: none; }
+    #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+               color: #ddd; font: 16px system-ui, sans-serif; }
+  </style>
+</head>
+<body>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <div id="loading">Loading simulation… <span id="pct">0</span>%</div>
+  <script src="Build/Build.loader.js"></script>
+  <script>
+    var canvas = document.getElementById("unity-canvas");
+    createUnityInstance(canvas, {
+      dataUrl: "Build/Build.data",
+      frameworkUrl: "Build/Build.framework.js",
+      codeUrl: "Build/Build.wasm",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "DefaultCompany",
+      productName: "SiteSafety",
+      productVersion: "0.1.0"
+    }, function (p) {
+      document.getElementById("pct").textContent = Math.round(p * 100);
+    }).then(function (instance) {
+      window.unityInstance = instance;
+      document.getElementById("loading").remove();
+      var ready = { source: "unity-sim", type: "ready", data: {} };
+      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(ready));
+      else window.parent.postMessage(ready, "*");
+    }).catch(function (e) {
+      document.getElementById("loading").textContent = "Simulation failed to load: " + e;
+    });
+
+    // Messages from the dashboard: { target: "unity-sim", method: "SetTelemetry", arg: {...} }
+    window.addEventListener("message", function (e) {
+      var m = e.data;
+      if (!m || m.target !== "unity-sim" || !window.unityInstance) return;
+      var arg = typeof m.arg === "string" ? m.arg : JSON.stringify(m.arg || {});
+      window.unityInstance.SendMessage(m.object || "Excavator", m.method, arg);
+    });
+
+    canvas.addEventListener("click", function () { canvas.focus(); });
+  </script>
+</body>
+</html>
