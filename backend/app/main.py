@@ -5,7 +5,9 @@ from app.api.alerts import router as alerts_router
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.incidents import router as incidents_router
+from app.api.model_bundles import router as model_bundles_router
 from app.api.operators import router as operators_router
+from app.api.predict import router as predict_router
 from app.api.supervisor import router as supervisor_router
 from app.api.sync import router as sync_router
 from app.api.tasks import router as tasks_router
@@ -27,3 +29,5 @@ app.include_router(incidents_router)
 app.include_router(operators_router)
 app.include_router(supervisor_router)
 app.include_router(sync_router)
+app.include_router(predict_router)
+app.include_router(model_bundles_router)

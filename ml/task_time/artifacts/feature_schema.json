@@ -1,0 +1,74 @@
+{
+  "features": [
+    "task_type",
+    "operator_skill",
+    "weather",
+    "soil_type",
+    "material_type",
+    "is_holiday",
+    "ppe_compliance_flag",
+    "pre_start_checklist_completed",
+    "machine_age_yrs",
+    "hours_since_last_service",
+    "precip_mm",
+    "wind_kmh",
+    "visibility_m",
+    "temp_c",
+    "humidity_pct",
+    "dig_depth_m",
+    "haul_distance_m",
+    "hour_of_day",
+    "day_of_week",
+    "planned_volume_m3",
+    "truck_wait_min",
+    "number_of_trucks",
+    "task_sequence_number_in_shift",
+    "number_of_nearby_workers",
+    "site_congestion_index_at_start",
+    "operator_fatigue_score_at_start",
+    "previous_task_overrun_ratio",
+    "measured_skill_score",
+    "operator_idle_ratio_7d"
+  ],
+  "categorical_encodings": {
+    "task_type": [
+      "Demolition",
+      "Earth Excavation",
+      "Grading",
+      "Material Loading",
+      "Trenching"
+    ],
+    "operator_skill": [
+      "Beginner",
+      "Expert",
+      "Intermediate"
+    ],
+    "weather": [
+      "Cloudy",
+      "Rainy",
+      "Sunny",
+      "Windy"
+    ],
+    "soil_type": [
+      "clay",
+      "laterite",
+      "sandy_loam"
+    ],
+    "material_type": [
+      "aggregate",
+      "debris_concrete",
+      "soil"
+    ]
+  },
+  "boolean_columns": [
+    "is_holiday",
+    "ppe_compliance_flag",
+    "pre_start_checklist_completed"
+  ],
+  "nullable_with_fleet_mean_fallback": [
+    "operator_idle_ratio_7d",
+    "previous_task_overrun_ratio"
+  ],
+  "target": "overrun_ratio",
+  "baseline": "est_min (implicitly assumes overrun_ratio = 1.0)"
+}

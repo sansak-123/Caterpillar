@@ -1,0 +1,9 @@
+{
+  "test_rows": 1600,
+  "baseline_mae_min": 15.715625,
+  "model_mae_min": 4.132988268106602,
+  "improvement_pct": 73.70140692395879,
+  "p90_coverage": 0.846875,
+  "onnx_max_abs_diff_p50": 9.284251767383012e-07,
+  "onnx_max_abs_diff_p90": 7.223407736400844e-07
+}

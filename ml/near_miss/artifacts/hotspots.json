@@ -1,0 +1,58 @@
+{
+  "total_near_misses": 2055,
+  "by_machine": {
+    "EXC004": 220,
+    "WLD003": 194,
+    "WLD002": 185,
+    "DZR002": 182,
+    "DZR001": 181,
+    "EXC006": 171,
+    "EXC001": 165,
+    "WLD004": 161,
+    "EXC005": 157,
+    "EXC003": 155,
+    "WLD001": 148,
+    "EXC002": 136
+  },
+  "by_hour": {
+    "0": 17,
+    "1": 13,
+    "2": 19,
+    "3": 17,
+    "4": 6,
+    "7": 16,
+    "8": 198,
+    "9": 253,
+    "10": 253,
+    "11": 248,
+    "12": 248,
+    "13": 213,
+    "14": 229,
+    "15": 179,
+    "16": 73,
+    "17": 11,
+    "18": 2,
+    "19": 1,
+    "20": 11,
+    "21": 16,
+    "22": 13,
+    "23": 19
+  },
+  "by_sector": {
+    "front/side (swing radius)": 1236,
+    "n/a (belt, not proximity)": 819
+  },
+  "by_condition": {
+    "Sunny": 1700,
+    "Rainy": 342,
+    "Cloudy": 13
+  },
+  "by_machine_class": {
+    "excavator": 1004,
+    "wheel_loader": 688,
+    "dozer": 363
+  },
+  "worst_hour": 9,
+  "worst_sector": "front/side (swing radius)",
+  "worst_condition": "Sunny"
+}
