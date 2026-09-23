@@ -3,8 +3,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
+import { GlassCard } from "../components/GlassCard";
 import { PrimaryButton } from "../components/PrimaryButton";
-import { color, spacing, type } from "../theme/tokens";
+import { ScreenBackground } from "../components/ScreenBackground";
+import { color, radius, spacing, type } from "../theme/tokens";
 
 type Scenario = {
   id: string;
@@ -42,66 +44,68 @@ const scenarios: Scenario[] = [
 
 export function TrainingScreen() {
   return (
-    <SafeAreaView style={styles.screen} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={type.label}>TRAINING</Text>
-        <Text style={[type.display, styles.title]}>Ghost Operator</Text>
-        <Text style={[type.body, styles.muted]}>
-          Unity simulator scenarios, downloadable for offline use.
-        </Text>
-
-        <Card accentColor={color.accent} style={styles.heroCard}>
-          <View style={styles.heroPreview}>
-            <Text style={styles.heroPreviewLabel}>Unity viewport</Text>
-          </View>
-          <View style={styles.rowBetween}>
-            <Text style={type.h2}>Your skill factor</Text>
-            <Badge label="0.82 → 0.90 goal" tone="info" />
-          </View>
+    <ScreenBackground>
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Text style={type.label}>TRAINING</Text>
+          <Text style={[type.display, styles.title]}>Ghost Operator</Text>
           <Text style={[type.body, styles.muted]}>
-            Closing the gap with the ghost improves your task-time estimates automatically.
+            Unity simulator scenarios, downloadable for offline use.
           </Text>
-          <PrimaryButton label="Launch Ghost Operator" onPress={() => {}} />
-        </Card>
 
-        <Text style={[type.h2, styles.sectionTitle]}>All scenarios</Text>
-        <View style={styles.scenarioList}>
-          {scenarios.map((s) => (
-            <Card key={s.id}>
-              <View style={styles.rowBetween}>
-                <Text style={[type.bodyStrong, styles.title]}>{s.title}</Text>
-                <Badge label={s.tag} tone={s.tag === "New from today" ? "danger" : "neutral"} />
-              </View>
-              <Text style={[type.body, styles.muted]}>{s.description}</Text>
-              <PrimaryButton label="Run scenario" onPress={() => {}} variant="secondary" fullWidth={false} />
+          <GlassCard glowColor={color.accentGlow} style={styles.heroCard}>
+            <View style={styles.heroPreview}>
+              <View style={styles.heroPreviewGlow} />
+              <Text style={styles.heroPreviewLabel}>Unity viewport</Text>
+            </View>
+            <View style={styles.rowBetween}>
+              <Text style={type.h2}>Your skill factor</Text>
+              <Badge label="0.82 → 0.90 goal" tone="info" />
+            </View>
+            <Text style={[type.body, styles.muted]}>
+              Closing the gap with the ghost improves your task-time estimates automatically.
+            </Text>
+            <PrimaryButton label="Launch Ghost Operator" onPress={() => {}} />
+          </GlassCard>
+
+          <Text style={[type.h2, styles.sectionTitle]}>All scenarios</Text>
+          <View style={styles.scenarioList}>
+            {scenarios.map((s) => (
+              <Card key={s.id}>
+                <View style={styles.rowBetween}>
+                  <Text style={[type.bodyStrong, styles.title]}>{s.title}</Text>
+                  <Badge label={s.tag} tone={s.tag === "New from today" ? "danger" : "neutral"} />
+                </View>
+                <Text style={[type.body, styles.muted]}>{s.description}</Text>
+                <PrimaryButton label="Run scenario" onPress={() => {}} variant="secondary" fullWidth={false} />
+              </Card>
+            ))}
+          </View>
+
+          <Text style={[type.h2, styles.sectionTitle]}>Other ways to learn</Text>
+          <View style={styles.rowGap}>
+            <Card style={styles.halfCard}>
+              <Text style={type.bodyStrong}>Video library</Text>
+              <Text style={[type.caption, styles.muted]}>12 lessons · 4 downloaded</Text>
             </Card>
-          ))}
-        </View>
-
-        <Text style={[type.h2, styles.sectionTitle]}>Other ways to learn</Text>
-        <View style={styles.rowGap}>
-          <Card style={styles.halfCard}>
-            <Text style={type.bodyStrong}>Video library</Text>
-            <Text style={[type.caption, styles.muted]}>12 lessons · 4 downloaded</Text>
-          </Card>
-          <Card style={styles.halfCard}>
-            <Text style={type.bodyStrong}>Book instructor</Text>
-            <Text style={[type.caption, styles.muted]}>Next slot: Fri 9:00 AM</Text>
-          </Card>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+            <Card style={styles.halfCard}>
+              <Text style={type.bodyStrong}>Book instructor</Text>
+              <Text style={[type.caption, styles.muted]}>Next slot: Fri 9:00 AM</Text>
+            </Card>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: color.bg,
   },
   content: {
     padding: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.xxl + 72,
     gap: spacing.md,
   },
   title: {
@@ -115,12 +119,21 @@ const styles = StyleSheet.create({
   },
   heroPreview: {
     height: 160,
-    borderRadius: 12,
-    backgroundColor: "#0B0C0E",
+    borderRadius: radius.md,
+    backgroundColor: "#050608",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: color.border,
+    borderColor: color.glassBorder,
+    overflow: "hidden",
+  },
+  heroPreviewGlow: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: color.accentGlow,
+    opacity: 0.5,
   },
   heroPreviewLabel: {
     color: color.textMuted,

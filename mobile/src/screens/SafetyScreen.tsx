@@ -4,7 +4,9 @@ import Svg, { Circle, Path, Polygon } from "react-native-svg";
 
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
+import { GlassCard } from "../components/GlassCard";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { ScreenBackground } from "../components/ScreenBackground";
 import { color, spacing, type } from "../theme/tokens";
 
 const RADAR_SIZE = 280;
@@ -29,14 +31,28 @@ function RadarView() {
   return (
     <View style={styles.radarWrap}>
       <Svg width={RADAR_SIZE} height={RADAR_SIZE}>
-        <Circle cx={CENTER} cy={CENTER} r={CENTER - 4} fill={`${color.safe}14`} stroke={color.safe} strokeWidth={1.5} />
-        <Circle cx={CENTER} cy={CENTER} r={(CENTER - 4) * 0.66} fill={`${color.caution}1A`} stroke={color.caution} strokeWidth={1.5} />
-        <Circle cx={CENTER} cy={CENTER} r={(CENTER - 4) * 0.33} fill={`${color.danger}22`} stroke={color.danger} strokeWidth={1.5} />
+        <Circle cx={CENTER} cy={CENTER} r={CENTER - 4} fill={`${color.safe}12`} stroke={color.safe} strokeWidth={1.5} />
+        <Circle
+          cx={CENTER}
+          cy={CENTER}
+          r={(CENTER - 4) * 0.66}
+          fill={`${color.caution}18`}
+          stroke={color.caution}
+          strokeWidth={1.5}
+        />
+        <Circle
+          cx={CENTER}
+          cy={CENTER}
+          r={(CENTER - 4) * 0.33}
+          fill={`${color.danger}22`}
+          stroke={color.danger}
+          strokeWidth={1.5}
+        />
 
         {/* rear blind-spot wedge */}
         <Polygon
           points={`${CENTER},${CENTER} ${blindSpotStart.x},${blindSpotStart.y} ${blindSpotEnd.x},${blindSpotEnd.y}`}
-          fill="rgba(255,255,255,0.06)"
+          fill="rgba(255,255,255,0.05)"
         />
 
         {/* machine body, boom pointing "forward" (up) */}
@@ -48,7 +64,7 @@ function RadarView() {
 
         {/* worker breaching the red zone from the rear */}
         <Circle cx={worker.x} cy={worker.y} r={7} fill={color.danger} />
-        <Circle cx={worker.x} cy={worker.y} r={12} fill="none" stroke={color.danger} strokeWidth={2} opacity={0.6} />
+        <Circle cx={worker.x} cy={worker.y} r={13} fill="none" stroke={color.danger} strokeWidth={2} opacity={0.55} />
       </Svg>
     </View>
   );
@@ -56,68 +72,70 @@ function RadarView() {
 
 export function SafetyScreen() {
   return (
-    <SafeAreaView style={styles.screen} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={type.label}>SAFETY</Text>
-        <Text style={[type.display, styles.title]}>Live proximity</Text>
+    <ScreenBackground>
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Text style={type.label}>SAFETY</Text>
+          <Text style={[type.display, styles.title]}>Live proximity</Text>
 
-        <Card style={styles.alertCard} accentColor={color.danger}>
-          <View style={styles.alertHeaderRow}>
-            <Badge label="RED ZONE" tone="danger" />
-            <Text style={[type.caption, styles.muted]}>Rear sector · swing in progress</Text>
-          </View>
-          <Text style={[type.h2, styles.title]}>Worker in blind spot while swinging</Text>
-          <Text style={[type.body, styles.muted]}>
-            Zone radius widened for current visibility (2.1 km) and wind (18 km/h).
-          </Text>
-        </Card>
+          <GlassCard glowColor={color.dangerGlow} style={styles.alertCard}>
+            <View style={styles.alertHeaderRow}>
+              <Badge label="RED ZONE" tone="danger" />
+              <Text style={[type.caption, styles.muted]}>Rear sector · swing in progress</Text>
+            </View>
+            <Text style={[type.h2, styles.title]}>Worker in blind spot while swinging</Text>
+            <Text style={[type.body, styles.muted]}>
+              Zone radius widened for current visibility (2.1 km) and wind (18 km/h).
+            </Text>
 
-        <RadarView />
+            <RadarView />
 
-        <View style={styles.legendRow}>
-          <Badge label="Green" tone="safe" />
-          <Badge label="Amber" tone="caution" />
-          <Badge label="Red · rear-weighted" tone="danger" />
-        </View>
+            <View style={styles.legendRow}>
+              <Badge label="Green" tone="safe" />
+              <Badge label="Amber" tone="caution" />
+              <Badge label="Red · rear-weighted" tone="danger" />
+            </View>
+          </GlassCard>
 
-        <Card>
-          <Text style={type.h2}>Seatbelt</Text>
-          <View style={styles.rowBetween}>
-            <Text style={[type.body, styles.muted]}>Status</Text>
-            <Badge label="Unfastened" tone="danger" />
-          </View>
-          <View style={styles.rowBetween}>
-            <Text style={[type.body, styles.muted]}>Engine / travel</Text>
-            <Text style={[type.bodyStrong, styles.title]}>On · traveling</Text>
-          </View>
-        </Card>
+          <Card>
+            <Text style={type.h2}>Seatbelt</Text>
+            <View style={styles.rowBetween}>
+              <Text style={[type.body, styles.muted]}>Status</Text>
+              <Badge label="Unfastened" tone="danger" />
+            </View>
+            <View style={styles.rowBetween}>
+              <Text style={[type.body, styles.muted]}>Engine / travel</Text>
+              <Text style={[type.bodyStrong, styles.title]}>On · traveling</Text>
+            </View>
+          </Card>
 
-        <Card>
-          <Text style={type.h2}>Working conditions</Text>
-          <View style={styles.conditionsGrid}>
-            <Condition label="Heat index" value="34°C" />
-            <Condition label="Wind" value="18 km/h" />
-            <Condition label="Visibility" value="2.1 km" />
-            <Condition label="On shift" value="3h 40m" />
-          </View>
-        </Card>
+          <Card>
+            <Text style={type.h2}>Working conditions</Text>
+            <View style={styles.conditionsGrid}>
+              <Condition label="Heat index" value="34°C" />
+              <Condition label="Wind" value="18 km/h" />
+              <Condition label="Visibility" value="2.1 km" />
+              <Condition label="On shift" value="3h 40m" />
+            </View>
+          </Card>
 
-        <Card accentColor={color.caution}>
-          <View style={styles.rowBetween}>
-            <Text style={type.h2}>Near-miss detected</Text>
-            <Badge label="Draft" tone="caution" />
-          </View>
-          <Text style={[type.body, styles.muted]}>
-            Auto-logged: red-zone entry during swing. Confirm to save, or dismiss if this was a
-            false read.
-          </Text>
-          <View style={styles.actionsRow}>
-            <PrimaryButton label="Confirm" onPress={() => {}} variant="primary" fullWidth={false} />
-            <PrimaryButton label="Dismiss" onPress={() => {}} variant="secondary" fullWidth={false} />
-          </View>
-        </Card>
-      </ScrollView>
-    </SafeAreaView>
+          <Card accentColor={color.caution}>
+            <View style={styles.rowBetween}>
+              <Text style={type.h2}>Near-miss detected</Text>
+              <Badge label="Draft" tone="caution" />
+            </View>
+            <Text style={[type.body, styles.muted]}>
+              Auto-logged: red-zone entry during swing. Confirm to save, or dismiss if this was a
+              false read.
+            </Text>
+            <View style={styles.actionsRow}>
+              <PrimaryButton label="Confirm" onPress={() => {}} variant="primary" fullWidth={false} />
+              <PrimaryButton label="Dismiss" onPress={() => {}} variant="secondary" fullWidth={false} />
+            </View>
+          </Card>
+        </ScrollView>
+      </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
@@ -133,11 +151,10 @@ function Condition({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: color.bg,
   },
   content: {
     padding: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.xxl + 72,
     gap: spacing.md,
   },
   title: {
@@ -147,7 +164,7 @@ const styles = StyleSheet.create({
     color: color.textMuted,
   },
   alertCard: {
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   alertHeaderRow: {
     flexDirection: "row",

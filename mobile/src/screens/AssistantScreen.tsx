@@ -1,11 +1,12 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AssistantIcon } from "../components/icons";
 import { Badge } from "../components/Badge";
-import { Card } from "../components/Card";
-import { PrimaryButton } from "../components/PrimaryButton";
-import { color, radius, spacing, touchTarget, type } from "../theme/tokens";
+import { GlassCard } from "../components/GlassCard";
+import { ScreenBackground } from "../components/ScreenBackground";
+import { color, radius, shadow, spacing, touchTarget, type } from "../theme/tokens";
 
 type QuickAction = { id: string; label: string };
 
@@ -18,65 +19,69 @@ const quickActions: QuickAction[] = [
 
 export function AssistantScreen() {
   return (
-    <SafeAreaView style={styles.screen} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.headerRow}>
-          <Text style={type.label}>ASSISTANT</Text>
-          <Badge label="Offline assistant" tone="caution" />
-        </View>
-        <Text style={[type.display, styles.title]}>How can I help?</Text>
-        <Text style={[type.body, styles.muted]}>
-          Offline mode answers from cached safety cards and SOPs. Online mode uses Claude for
-          free-form questions and incident structuring.
-        </Text>
+    <ScreenBackground>
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.headerRow}>
+            <Text style={type.label}>ASSISTANT</Text>
+            <Badge label="Offline assistant" tone="caution" />
+          </View>
+          <Text style={[type.display, styles.title]}>How can I help?</Text>
+          <Text style={[type.body, styles.muted]}>
+            Offline mode answers from cached safety cards and SOPs. Online mode uses Claude for
+            free-form questions and incident structuring.
+          </Text>
 
-        <View style={styles.quickGrid}>
-          {quickActions.map((a) => (
-            <PressableAction key={a.id} label={a.label} />
-          ))}
-        </View>
+          <View style={styles.quickGrid}>
+            {quickActions.map((a) => (
+              <PressableAction key={a.id} label={a.label} />
+            ))}
+          </View>
 
-        <Card>
-          <View style={styles.messageRow}>
-            <View style={styles.avatar}>
-              <AssistantIcon color={color.bg} size={18} />
+          <GlassCard glowColor={color.infoGlow}>
+            <View style={styles.messageRow}>
+              <View style={styles.avatar}>
+                <AssistantIcon color={color.bg} size={18} />
+              </View>
+              <View style={styles.bubble}>
+                <Text style={[type.body, styles.title]}>
+                  Your 10:00 estimate was widened by +9 min for rain and +6 min because this is a
+                  beginner-skill task. Want the full breakdown?
+                </Text>
+              </View>
             </View>
-            <View style={styles.bubble}>
-              <Text style={[type.body, styles.title]}>
-                Your 10:00 estimate was widened by +9 min for rain and +6 min because this is a
-                beginner-skill task. Want the full breakdown?
-              </Text>
+          </GlassCard>
+
+          <View style={styles.inputBar}>
+            <Text style={[type.body, styles.inputPlaceholder]}>Type or hold to talk…</Text>
+            <View style={styles.micButton}>
+              <Text style={styles.micGlyph}>●</Text>
             </View>
           </View>
-        </Card>
-
-        <View style={styles.inputBar}>
-          <Text style={[type.body, styles.inputPlaceholder]}>Type or hold to talk…</Text>
-          <View style={styles.micButton}>
-            <Text style={styles.micGlyph}>●</Text>
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 function PressableAction({ label }: { label: string }) {
   return (
-    <View style={styles.actionTile}>
+    <Pressable
+      onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+      style={({ pressed }) => [styles.actionTile, pressed ? styles.actionTilePressed : null]}
+    >
       <Text style={[type.bodyStrong, styles.title]}>{label}</Text>
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: color.bg,
   },
   content: {
     padding: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.xxl + 72,
     gap: spacing.md,
   },
   headerRow: {
@@ -105,6 +110,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
+    ...shadow.card,
+  },
+  actionTilePressed: {
+    backgroundColor: color.surface,
+    opacity: 0.85,
   },
   messageRow: {
     flexDirection: "row",
@@ -132,6 +142,7 @@ const styles = StyleSheet.create({
     borderColor: color.border,
     paddingHorizontal: spacing.md,
     justifyContent: "space-between",
+    ...shadow.card,
   },
   inputPlaceholder: {
     color: color.textMuted,
@@ -143,6 +154,7 @@ const styles = StyleSheet.create({
     backgroundColor: color.accent,
     alignItems: "center",
     justifyContent: "center",
+    ...shadow.glow(color.accentGlow),
   },
   micGlyph: {
     color: "#1B1400",

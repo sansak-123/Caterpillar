@@ -12,10 +12,25 @@ const toneColor: Record<BadgeTone, string> = {
   neutral: color.textSecondary,
 };
 
+const glowColor: Record<BadgeTone, string | null> = {
+  safe: color.safeGlow,
+  caution: color.cautionGlow,
+  danger: color.dangerGlow,
+  info: color.infoGlow,
+  neutral: null,
+};
+
 export function Badge({ label, tone = "neutral" }: { label: string; tone?: BadgeTone }) {
   const tint = toneColor[tone];
+  const glow = glowColor[tone];
   return (
-    <View style={[styles.badge, { borderColor: tint, backgroundColor: `${tint}1F` }]}>
+    <View
+      style={[
+        styles.badge,
+        { borderColor: `${tint}40`, backgroundColor: `${tint}17` },
+        glow ? { shadowColor: glow, shadowOpacity: 1, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } } : null,
+      ]}
+    >
       <View style={[styles.dot, { backgroundColor: tint }]} />
       <Text style={[type.label, styles.text, { color: tint }]}>{label}</Text>
     </View>
@@ -30,7 +45,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.pill,
     paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.sm + 2,
     gap: spacing.xs,
   },
   dot: {

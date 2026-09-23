@@ -4,7 +4,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
 import { ConnectivityPill } from "../components/ConnectivityPill";
+import { GlassCard } from "../components/GlassCard";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { ScreenBackground } from "../components/ScreenBackground";
 import { color, spacing, type } from "../theme/tokens";
 
 type TaskStatus = "pending" | "in_progress" | "done";
@@ -19,7 +21,7 @@ type Task = {
   status: TaskStatus;
 };
 
-// Mock day plan mirroring the seed/demo scenario — Phase 2/4 will replace this with the
+// Mock day plan mirroring the seed/demo scenario — Phase 4 will replace this with the
 // pre-scored plan pulled from /sync/pull and re-scored offline via lib/onnx.
 const mockTasks: Task[] = [
   {
@@ -66,9 +68,9 @@ const riskLabel: Record<Task["risk"], string> = {
   danger: "High risk",
 };
 
-function TaskCard({ task }: { task: Task }) {
+function TaskBody({ task }: { task: Task }) {
   return (
-    <Card accentColor={color[task.risk]} style={styles.taskCard}>
+    <>
       <View style={styles.taskHeader}>
         <Text style={[type.bodyStrong, styles.taskTitle]} numberOfLines={2}>
           {task.title}
@@ -99,44 +101,63 @@ function TaskCard({ task }: { task: Task }) {
           <PrimaryButton label="Start task" onPress={() => {}} variant="secondary" fullWidth={false} />
         )}
       </View>
-    </Card>
+    </>
   );
 }
 
 export function TodayScreen() {
+  const inProgress = mockTasks.find((t) => t.status === "in_progress");
+  const upcoming = mockTasks.filter((t) => t.status !== "in_progress");
+  const totalMin = mockTasks.reduce((sum, t) => sum + t.p50Min, 0);
+
   return (
-    <SafeAreaView style={styles.screen} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={type.label}>Wed, 1 May</Text>
-            <Text style={[type.display, styles.title]}>Today's tasks</Text>
+    <ScreenBackground>
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={type.label}>WED, 1 MAY</Text>
+              <Text style={[type.display, styles.title]}>Today&apos;s tasks</Text>
+            </View>
+            <ConnectivityPill />
           </View>
-          <ConnectivityPill />
-        </View>
 
-        <Text style={[type.caption, styles.muted]}>
-          OP1001 · EXC001 · 4 tasks scheduled — reorder anytime
-        </Text>
+          <View style={styles.statRow}>
+            <Text style={[type.caption, styles.muted]}>OP1001 · EXC001</Text>
+            <View style={styles.statDivider} />
+            <Text style={[type.caption, styles.muted]}>{mockTasks.length} tasks</Text>
+            <View style={styles.statDivider} />
+            <Text style={[type.caption, styles.muted]}>~{Math.round(totalMin / 60)}h {totalMin % 60}m total</Text>
+          </View>
 
-        <View style={styles.taskList}>
-          {mockTasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          {inProgress ? (
+            <GlassCard glowColor={color.infoGlow} style={styles.heroTask}>
+              <Text style={[type.label, { color: color.info }]}>IN PROGRESS</Text>
+              <TaskBody task={inProgress} />
+            </GlassCard>
+          ) : null}
+
+          <Text style={[type.h2, styles.sectionTitle]}>Up next</Text>
+          <View style={styles.taskList}>
+            {upcoming.map((task) => (
+              <Card key={task.id} accentColor={color[task.risk]} style={styles.taskCard}>
+                <TaskBody task={task} />
+              </Card>
+            ))}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: color.bg,
   },
   content: {
     padding: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.xxl + 72,
     gap: spacing.md,
   },
   headerRow: {
@@ -150,9 +171,26 @@ const styles = StyleSheet.create({
   muted: {
     color: color.textMuted,
   },
+  statRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  statDivider: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: color.textMuted,
+  },
+  heroTask: {
+    marginTop: spacing.xs,
+  },
+  sectionTitle: {
+    color: color.textPrimary,
+    marginTop: spacing.sm,
+  },
   taskList: {
     gap: spacing.sm,
-    marginTop: spacing.sm,
   },
   taskCard: {
     gap: spacing.sm,

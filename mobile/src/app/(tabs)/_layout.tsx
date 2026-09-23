@@ -1,4 +1,7 @@
 import { Tabs } from "expo-router";
+import * as Haptics from "expo-haptics";
+import { BlurView } from "expo-blur";
+import { StyleSheet } from "react-native";
 
 import { AssistantIcon, SafetyIcon, TodayIcon, TrainingIcon } from "../../components/icons";
 import { color } from "../../theme/tokens";
@@ -6,16 +9,26 @@ import { color } from "../../theme/tokens";
 export default function TabLayout() {
   return (
     <Tabs
+      screenListeners={{
+        tabPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        },
+      }}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: color.accent,
         tabBarInactiveTintColor: color.textMuted,
+        tabBarBackground: () => (
+          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+        ),
         tabBarStyle: {
-          backgroundColor: color.surface,
+          backgroundColor: "transparent",
           borderTopColor: color.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
           height: 72,
           paddingBottom: 10,
           paddingTop: 8,
+          position: "absolute",
         },
         tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
       }}
