@@ -82,6 +82,22 @@ export function SpeakerIcon({ color, size = 24 }: IconProps) {
   );
 }
 
+// Dev-only demo panel entry point (flask icon).
+export function FlaskIcon({ color, size = 24 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M9 3h6M10 3v6l-5.5 9.5A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.5L14 9V3"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Line x1={7.5} y1={15} x2={16.5} y2={15} stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 // Checklist item state — used by the digital pre-start walkaround checklist.
 export function CheckIcon({ color, size = 24 }: IconProps) {
   return (

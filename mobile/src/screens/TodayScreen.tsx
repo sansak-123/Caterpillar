@@ -11,7 +11,7 @@ import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
 import { ConnectivityPill } from "../components/ConnectivityPill";
 import { GlassCard } from "../components/GlassCard";
-import { HazardIcon, SpeakerIcon } from "../components/icons";
+import { FlaskIcon, HazardIcon, SpeakerIcon } from "../components/icons";
 import { InsightCard } from "../components/InsightCard";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ProgressRing } from "../components/ProgressRing";
@@ -182,10 +182,19 @@ export function TodayScreen() {
   const checkedCount = useChecklistStore((s) => s.checkedIds.size);
   const setConnectivityStatus = useConnectivityStore((s) => s.setStatus);
   const markSynced = useConnectivityStore((s) => s.markSynced);
+  const devNetworkCut = useConnectivityStore((s) => s.devNetworkCut);
   const setSession = useAuthStore((s) => s.setSession);
   const [liveTasks, setLiveTasks] = useState<Task[] | null>(null);
 
   useEffect(() => {
+    if (devNetworkCut) {
+      // Demo panel forced offline (§3.1: "a demo 'Cut network' toggle") — never touch
+      // the network, and keep whatever was last synced rather than clearing it, same
+      // as real airplane-mode behaviour.
+      setConnectivityStatus("offline");
+      return;
+    }
+
     let cancelled = false;
     setConnectivityStatus("syncing");
 
@@ -211,7 +220,7 @@ export function TodayScreen() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [devNetworkCut]);
 
   const tasks = liveTasks ?? mockTasks;
   const inProgress = tasks.find((t) => t.status === "in_progress");
@@ -228,6 +237,14 @@ export function TodayScreen() {
               <Text style={[type.display, { color: colors.textPrimary }]}>Today&apos;s tasks</Text>
             </View>
             <View style={styles.headerActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Demo panel"
+                onPress={() => router.push("/demo")}
+                style={[styles.iconButton, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}
+              >
+                <FlaskIcon color={colors.textSecondary} size={18} />
+              </Pressable>
               <ThemeToggle />
               <ConnectivityPill />
             </View>
@@ -353,6 +370,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   progressCard: {
     flexDirection: "row",

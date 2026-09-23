@@ -29,6 +29,15 @@ export default function RootLayout() {
             headerTintColor: colors.textPrimary,
           }}
         />
+        <Stack.Screen
+          name="demo"
+          options={{
+            headerShown: true,
+            title: "Demo Panel",
+            headerStyle: { backgroundColor: colors.surface },
+            headerTintColor: colors.textPrimary,
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );
