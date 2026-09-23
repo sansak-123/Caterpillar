@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.alerts import router as alerts_router
+from app.api.assistant import router as assistant_router
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.incidents import router as incidents_router
@@ -22,6 +23,7 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(assistant_router)
 app.include_router(auth_router)
 app.include_router(tasks_router)
 app.include_router(alerts_router)
