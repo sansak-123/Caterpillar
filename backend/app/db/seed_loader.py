@@ -96,7 +96,15 @@ async def _load_operators(session) -> int:
 async def _load_schedule_today(session) -> int:
     """Seeds the demo-day schedule (schedule_today.csv) as real Task rows, since that's
     what /tasks/today actually serves — the full 90-day tasks.csv is for ML training,
-    not for populating the live tasks table."""
+    not for populating the live tasks table.
+
+    schedule_today.csv bakes in whatever `config.demo_day` was at generation time
+    (2025-05-01) — but /tasks/today filters on the real current date, so a straight
+    import would silently show nothing. "Today's schedule" should always mean today,
+    so we override scheduled_date to the actual current date on load rather than
+    trusting the CSV's frozen demo date.
+    """
+    today = dt.date.today()
     df = pd.read_csv(DATA_GENERATED / "schedule_today.csv")
     rows = [
         {
@@ -106,7 +114,7 @@ async def _load_schedule_today(session) -> int:
             "machine_id": r.machine_id,
             "site_id": r.site_id,
             "task_type": r.task_type,
-            "scheduled_date": dt.date.fromisoformat(r.task_date),
+            "scheduled_date": today,
             "status": "pending",
             "est_min": r.est_min,
             "p50_min": r.est_min,

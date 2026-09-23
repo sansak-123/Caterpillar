@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -17,7 +18,10 @@ import { ProgressRing } from "../components/ProgressRing";
 import { ScreenBackground } from "../components/ScreenBackground";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { PRE_START_CHECKLIST } from "../content/preStartChecklist";
+import { ensureDemoSession, fetchTasksToday, type ApiTask } from "../lib/api/client";
+import { useAuthStore } from "../store/auth";
 import { useChecklistStore } from "../store/checklist";
+import { useConnectivityStore } from "../store/connectivity";
 import { useColors } from "../theme/useColors";
 import { radius, shadow, spacing, touchTarget, type } from "../theme/tokens";
 
@@ -92,6 +96,22 @@ const riskLabel: Record<Task["risk"], string> = {
   danger: "High risk",
 };
 
+function mapApiTask(t: ApiTask): Task {
+  const risk: Task["risk"] = t.risk_band === "danger" ? "danger" : t.risk_band === "caution" ? "caution" : "safe";
+  const status: TaskStatus = t.status === "in_progress" || t.status === "done" ? t.status : "pending";
+  return {
+    id: t.task_id,
+    title: `${t.task_type} — ${t.machine_id}`,
+    depth: "—",
+    p50Min: t.p50_min ?? t.est_min,
+    p90Min: t.p90_min ?? t.est_min,
+    weather: t.weather_condition ?? "Unknown",
+    risk,
+    status,
+    hazards: [],
+  };
+}
+
 function speakTask(task: Task) {
   const hazardText = task.hazards.length ? ` Known hazards: ${task.hazards.join(". ")}.` : "";
   const depthText = task.depth !== "—" ? ` Dig depth ${task.depth}.` : "";
@@ -159,10 +179,44 @@ function TaskBody({ task, colors }: { task: Task; colors: ReturnType<typeof useC
 
 export function TodayScreen() {
   const colors = useColors();
-  const inProgress = mockTasks.find((t) => t.status === "in_progress");
-  const upcoming = mockTasks.filter((t) => t.status !== "in_progress");
-  const doneCount = mockTasks.filter((t) => t.status === "done").length;
   const checkedCount = useChecklistStore((s) => s.checkedIds.size);
+  const setConnectivityStatus = useConnectivityStore((s) => s.setStatus);
+  const markSynced = useConnectivityStore((s) => s.markSynced);
+  const setSession = useAuthStore((s) => s.setSession);
+  const [liveTasks, setLiveTasks] = useState<Task[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setConnectivityStatus("syncing");
+
+    (async () => {
+      try {
+        const { token, operatorId } = await ensureDemoSession();
+        const apiTasks = await fetchTasksToday(token);
+        if (cancelled) return;
+        setSession(token, operatorId);
+        setLiveTasks(apiTasks.map(mapApiTask));
+        setConnectivityStatus("online");
+        markSynced();
+      } catch {
+        // Real backend not reachable (e.g. not running locally) — fall back to demo
+        // data rather than showing an empty/broken screen. This is the same
+        // "keeps working without a connection" principle as the safety engine,
+        // just applied to a plain data fetch instead of on-device rules.
+        if (!cancelled) setConnectivityStatus("offline");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const tasks = liveTasks ?? mockTasks;
+  const inProgress = tasks.find((t) => t.status === "in_progress");
+  const upcoming = tasks.filter((t) => t.status !== "in_progress");
+  const doneCount = tasks.filter((t) => t.status === "done").length;
 
   return (
     <ScreenBackground>
@@ -191,18 +245,18 @@ export function TodayScreen() {
           <Animated.View entering={FadeInDown.delay(80).duration(400)}>
             <Card style={styles.progressCard}>
               <ProgressRing
-                progress={doneCount / mockTasks.length}
+                progress={tasks.length ? doneCount / tasks.length : 0}
                 size={92}
                 strokeWidth={9}
                 color={colors.accent}
                 trackColor={colors.ringTrack}
-                value={`${doneCount}/${mockTasks.length}`}
+                value={`${doneCount}/${tasks.length}`}
                 valueColor={colors.textPrimary}
               />
               <View style={styles.progressText}>
                 <Text style={[type.h2, { color: colors.textPrimary }]}>OP1001 · EXC001</Text>
                 <Text style={[type.caption, { color: colors.textMuted }]}>
-                  {mockTasks.length} tasks scheduled today — reorder anytime
+                  {tasks.length} tasks scheduled today · {liveTasks ? "live from backend" : "demo data"} — reorder anytime
                 </Text>
               </View>
             </Card>
