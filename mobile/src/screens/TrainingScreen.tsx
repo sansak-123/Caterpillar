@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { router } from "expo-router";
 
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
@@ -99,7 +100,11 @@ export function TrainingScreen() {
               <Text style={[type.body, { color: colors.textMuted }]}>
                 Closing the gap with the ghost improves your task-time estimates automatically.
               </Text>
-              <PrimaryButton label="Launch Ghost Operator" onPress={() => {}} variant="accent" />
+              <PrimaryButton
+                label="Launch Ghost Operator"
+                onPress={() => router.push({ pathname: "/simulator", params: { scenario: "GhostOperator" } })}
+                variant="accent"
+              />
             </GlassCard>
           </Animated.View>
 
@@ -113,7 +118,12 @@ export function TrainingScreen() {
                     <Badge label={s.tag} tone={s.tag === "New from today" ? "danger" : "neutral"} />
                   </View>
                   <Text style={[type.body, { color: colors.textMuted }]}>{s.description}</Text>
-                  <PrimaryButton label="Run scenario" onPress={() => {}} variant="secondary" fullWidth={false} />
+                  <PrimaryButton
+                    label="Run scenario"
+                    onPress={() => router.push({ pathname: "/simulator", params: { scenario: s.id } })}
+                    variant="secondary"
+                    fullWidth={false}
+                  />
                 </Card>
               </Animated.View>
             ))}

@@ -38,6 +38,15 @@ export default function RootLayout() {
             headerTintColor: colors.textPrimary,
           }}
         />
+        <Stack.Screen
+          name="simulator"
+          options={{
+            headerShown: true,
+            title: "Simulator",
+            headerStyle: { backgroundColor: colors.surface },
+            headerTintColor: colors.textPrimary,
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );
