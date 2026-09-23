@@ -1,0 +1,57 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: operator_os
+      POSTGRES_PASSWORD: operator_os
+      POSTGRES_DB: operator_os
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U operator_os"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  api:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://operator_os:operator_os@db:5432/operator_os
+      MQTT_HOST: mqtt
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+
+  simulator:
+    build:
+      context: ./simulator
+    environment:
+      MQTT_HOST: mqtt
+    depends_on:
+      - mqtt
+    volumes:
+      - ./simulator:/app
+      - ./data:/data
+
+volumes:
+  db_data:

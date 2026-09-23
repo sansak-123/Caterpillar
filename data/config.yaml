@@ -1,0 +1,54 @@
+# Calibration knobs for data/generators/*.py — see CLAUDE.md section 5 and data/calibration.md
+# for the standard/source backing each value. Change here, not in code.
+
+random_seed: 42
+
+fleet:
+  num_machines: 12
+  classes: [excavator, wheel_loader, dozer]
+  num_operators: 40
+  num_sites: 3
+
+days: 90
+demo_day: "2025-05-01"
+
+personas:
+  mix:
+    disciplined: 0.40
+    idler: 0.15
+    belt_skipper: 0.15
+    rusher: 0.15
+    learner: 0.15
+
+idle:
+  fleet_mean_ratio: [0.25, 0.40]
+  idler_persona_ratio: [0.55, 0.75]
+  fuel_burn_idle_lph: [3, 5]
+  fuel_burn_work_multiplier: [3, 6]
+
+overrun_multiplier:
+  skill:
+    expert: 0.95
+    intermediate: 1.08
+    beginner: 1.35
+  weather:
+    sunny: 1.00
+    cloudy: 1.03
+    rainy: 1.15
+    windy: 1.15
+  machine_age_pct_per_year_above_3yrs: [0.01, 0.02]
+  maintenance_debt_max_multiplier: 1.08
+  fatigue_max_multiplier: 1.15
+
+fatigue:
+  hours_awake_threshold: 10
+  night_shift_penalty_per_consecutive: 0.03
+
+near_miss:
+  near_miss_to_incident_ratio: 250
+
+tasks:
+  count: 8000
+
+cycles:
+  count: 2000

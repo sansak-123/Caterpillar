@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node / Expo / React Native
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.jsbundle
+mobile/android/
+mobile/ios/
+
+# Env
+.env
+.env.local
+*.pem
+
+# Data (generated is reproducible, keep only curated samples)
+data/generated/*
+!data/generated/.gitkeep
+!data/generated/samples/
+
+# ML artifacts
+ml/**/*.onnx
+ml/**/mlruns/
+ml/**/*.pkl
+
+# Unity
+unity/OperatorSim/Library/
+unity/OperatorSim/Temp/
+unity/OperatorSim/Obj/
+unity/OperatorSim/Build/
+unity/OperatorSim/BuildAndroid/
+unity/OperatorSim/BuildIOS/
+unity/OperatorSim/BuildWebGL/
+unity/OperatorSim/UserSettings/
+unity/OperatorSim/*.csproj
+unity/OperatorSim/*.sln
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
