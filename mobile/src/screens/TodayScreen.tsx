@@ -1,10 +1,10 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { router } from "expo-router";
 
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
-import { Pressable } from "react-native";
 
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
@@ -16,8 +16,10 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { ProgressRing } from "../components/ProgressRing";
 import { ScreenBackground } from "../components/ScreenBackground";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { PRE_START_CHECKLIST } from "../content/preStartChecklist";
+import { useChecklistStore } from "../store/checklist";
 import { useColors } from "../theme/useColors";
-import { spacing, type } from "../theme/tokens";
+import { radius, shadow, spacing, touchTarget, type } from "../theme/tokens";
 
 type TaskStatus = "pending" | "in_progress" | "done";
 
@@ -160,6 +162,7 @@ export function TodayScreen() {
   const inProgress = mockTasks.find((t) => t.status === "in_progress");
   const upcoming = mockTasks.filter((t) => t.status !== "in_progress");
   const doneCount = mockTasks.filter((t) => t.status === "done").length;
+  const checkedCount = useChecklistStore((s) => s.checkedIds.size);
 
   return (
     <ScreenBackground>
@@ -205,6 +208,23 @@ export function TodayScreen() {
             </Card>
           </Animated.View>
 
+          <Animated.View entering={FadeInDown.delay(110).duration(400)}>
+            <View style={styles.shiftToolsRow}>
+              <ShiftToolButton
+                label="Pre-start checklist"
+                sublabel={`${checkedCount}/${PRE_START_CHECKLIST.length} done`}
+                onPress={() => router.push("/checklist")}
+                colors={colors}
+              />
+              <ShiftToolButton
+                label="End-of-shift log"
+                sublabel="Auto-filled"
+                onPress={() => router.push("/shift-log")}
+                colors={colors}
+              />
+            </View>
+          </Animated.View>
+
           {inProgress ? (
             <Animated.View entering={FadeInDown.delay(140).duration(400)}>
               <GlassCard glowColor={colors.infoGlow} style={styles.heroTask}>
@@ -227,6 +247,37 @@ export function TodayScreen() {
         </ScrollView>
       </SafeAreaView>
     </ScreenBackground>
+  );
+}
+
+function ShiftToolButton({
+  label,
+  sublabel,
+  onPress,
+  colors,
+}: {
+  label: string;
+  sublabel: string;
+  onPress: () => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      style={[
+        styles.shiftToolButton,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        shadow.card(colors.mode),
+      ]}
+    >
+      <Text style={[type.bodyStrong, { color: colors.textPrimary }]} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={[type.caption, { color: colors.textMuted }]}>{sublabel}</Text>
+    </Pressable>
   );
 }
 
@@ -290,5 +341,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
     marginTop: spacing.xs,
+  },
+  shiftToolsRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  shiftToolButton: {
+    flex: 1,
+    minHeight: touchTarget,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.sm,
+    justifyContent: "center",
+    gap: 2,
   },
 });

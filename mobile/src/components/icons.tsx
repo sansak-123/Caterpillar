@@ -82,6 +82,15 @@ export function SpeakerIcon({ color, size = 24 }: IconProps) {
   );
 }
 
+// Checklist item state — used by the digital pre-start walkaround checklist.
+export function CheckIcon({ color, size = 24 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M5 13l4 4 10-10" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 // Marks a known hazard on a task card (buried utilities, slopes, nearby workers).
 export function HazardIcon({ color, size = 24 }: IconProps) {
   return (

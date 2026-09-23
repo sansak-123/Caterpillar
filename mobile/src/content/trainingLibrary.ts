@@ -1,117 +1,94 @@
 /**
- * Real training lesson content — CLAUDE.md section 6 ("Training hub"). Not placeholder
- * stat cards: each lesson has a real title and summary grounded in the same standards
- * referenced in section 5 (ISO 5006 blind spots, ISO 6683/3471 seatbelt+ROPS, OSHA 29
- * CFR 1926.602, ISO 16001/21815 proximity systems, CAT Performance Handbook cycle
- * time). Video URIs are placeholders (`videoUri: null`) until real footage exists —
- * the content and structure are real, the media asset is the only missing piece.
+ * Operator-first training content for the in-cab library. These are short,
+ * practical lessons for a supervised learner; the machine manufacturer manual,
+ * site rules, lift plan and a competent trainer always take precedence.
  */
 
 export type LessonCategory = "safety" | "efficiency" | "compliance" | "onboarding" | "skill";
+export type LessonLevel = "beginner" | "foundation" | "practice";
 
 export type Lesson = {
   id: string;
   title: string;
   category: LessonCategory;
+  level: LessonLevel;
   durationMin: number;
-  languages: Array<"en" | "hi" | "ta">;
+  languages: ("en" | "hi" | "ta")[];
   summary: string;
+  objective: string;
+  keySteps: string[];
   standardRef?: string;
   downloadedOffline: boolean;
   videoUri: string | null;
 };
 
+const allLanguages: Lesson["languages"] = ["en", "hi", "ta"];
+
 export const trainingLibrary: Lesson[] = [
   {
-    id: "seatbelt-rops-5s",
-    title: "Seatbelt & ROPS: Why 5 Seconds Matters",
-    category: "safety",
+    id: "welcome-to-operatoros",
+    title: "Start Here: Your First Safe Shift",
+    category: "onboarding",
+    level: "beginner",
     durationMin: 4,
-    languages: ["en", "hi", "ta"],
-    summary:
-      "The rollover protective structure only protects you if you're strapped into the seat it's built around — this walks through real rollover geometry and why the app alerts after 5 seconds unfastened while moving, not immediately.",
-    standardRef: "OSHA 29 CFR 1926.602, ISO 3471 (ROPS), ISO 6683 (seatbelts)",
+    languages: allLanguages,
+    summary: "A new operator's map of the day: inspect, plan, operate, pause safely, report hazards, and hand over cleanly.",
+    objective: "Know the safe sequence of a shift and when to stop and ask for help.",
+    keySteps: ["Read the task and hazards before starting", "Complete the walkaround", "Use the seatbelt and three-point contact", "Stop work for an unknown hazard or unsafe condition"],
     downloadedOffline: true,
     videoUri: null,
   },
   {
-    id: "reading-blind-spots",
-    title: "Reading Your Machine's Blind Spots",
-    category: "safety",
+    id: "cab-controls-and-visibility",
+    title: "Know Your Cab: Controls, Mirrors and Visibility",
+    category: "onboarding",
+    level: "beginner",
     durationMin: 6,
-    languages: ["en", "hi", "ta"],
-    summary:
-      "Every machine class has a different blind-spot shape — excavators lose the rear arc when swinging, wheel loaders lose the front over a raised bucket. Learn your machine's actual blind-spot profile, not a generic rule of thumb.",
-    standardRef: "ISO 5006 (operator field of view)",
+    languages: allLanguages,
+    summary: "Learn the purpose of primary controls, display warnings, mirrors/cameras, horn and emergency stop before moving a machine.",
+    objective: "Set up the cab so you can see, reach and respond safely.",
+    keySteps: ["Adjust seat, mirrors and camera view", "Locate horn, emergency stop and fire extinguisher", "Check warning lamps before travel", "Never operate a control you do not understand"],
+    standardRef: "Follow the machine-specific operator manual",
     downloadedOffline: true,
     videoUri: null,
   },
   {
-    id: "proximity-alert-levels",
-    title: "Amber vs Red: Understanding Proximity Alerts",
+    id: "safe-entry-exit",
+    title: "Safe Entry and Exit: Three Points of Contact",
     category: "safety",
+    level: "beginner",
     durationMin: 3,
-    languages: ["en", "hi", "ta"],
-    summary:
-      "Why the app's warning radius isn't a fixed number — it widens in rain, wind, and low visibility, and tightens the rear sector further during swing or reverse. Knowing why a zone moved builds trust in the alert instead of annoyance at it.",
-    standardRef: "ISO 16001, ISO 21815 (proximity/collision warning systems)",
-    downloadedOffline: false,
-    videoUri: null,
-  },
-  {
-    id: "reversing-safely",
-    title: "Reversing Safely: Blind Spot & Spotter Protocol",
-    category: "safety",
-    durationMin: 5,
-    languages: ["en", "hi", "ta"],
-    summary:
-      "When to reverse on instruments alone versus when the job requires a spotter, and how to communicate with a spotter without leaving the cab.",
-    standardRef: "ISO 5006, ISO 21815",
-    downloadedOffline: false,
-    videoUri: null,
-  },
-  {
-    id: "monsoon-conditions",
-    title: "Working Safely in Monsoon Conditions",
-    category: "safety",
-    durationMin: 5,
-    languages: ["en", "hi", "ta"],
-    summary:
-      "Reduced traction, reduced visibility, and softer ground bearing capacity all compound in heavy rain — practical adjustments to dig depth, travel speed, and load size during the wet season.",
-    downloadedOffline: false,
-    videoUri: null,
-  },
-  {
-    id: "efficient-dig-cycles",
-    title: "Efficient Dig Cycles: Boom–Stick–Bucket Timing",
-    category: "skill",
-    durationMin: 8,
-    languages: ["en", "hi", "ta"],
-    summary:
-      "The four phases of a dig cycle — dig, swing-load, dump, swing-return — and how experts overlap boom/stick/bucket motion to cut cycle time without rushing. This is exactly what the Ghost Operator simulator scores you against.",
-    standardRef: "CAT Performance Handbook cycle-time methodology",
+    languages: allLanguages,
+    summary: "Falls happen before work begins. Practise facing the machine, using handholds, clearing mud, and never jumping from the cab.",
+    objective: "Enter and exit without a slip, fall or unintended control movement.",
+    keySteps: ["Face the machine", "Keep three points of contact", "Clean boots and steps", "Use designated access points only"],
     downloadedOffline: true,
-    videoUri: null,
-  },
-  {
-    id: "idle-discipline-savings",
-    title: "Idle Discipline: Fuel & Wear Savings",
-    category: "efficiency",
-    durationMin: 5,
-    languages: ["en", "hi", "ta"],
-    summary:
-      "Idle fuel burn is 3-5 L/h depending on machine size — over a shift, unjustified idle adds up in fuel cost and engine hours toward the next service. Covers the difference between necessary standby and avoidable idle.",
-    downloadedOffline: false,
     videoUri: null,
   },
   {
     id: "pre-start-checklist-walkthrough",
-    title: "Pre-Start Walkaround Checklist Walkthrough",
+    title: "Pre-Start Walkaround Checklist",
     category: "compliance",
+    level: "beginner",
+    durationMin: 6,
+    languages: allLanguages,
+    summary: "A practical walkaround covering leaks, hoses, tracks/tyres, attachments, guards, lights, alarms, fluids and the work area.",
+    objective: "Find defects before they become breakdowns or injuries.",
+    keySteps: ["Walk one consistent route around the machine", "Look for leaks, damage and loose parts", "Test alarms and lights from a safe position", "Tag out and report a critical defect"],
+    downloadedOffline: true,
+    videoUri: null,
+  },
+  {
+    id: "seatbelt-rops-5s",
+    title: "Seatbelt and ROPS: Why It Matters",
+    category: "safety",
+    level: "beginner",
     durationMin: 4,
-    languages: ["en", "hi", "ta"],
-    summary:
-      "A guided run-through of the digital pre-start checklist — what each item is actually checking for and why it replaces the paper walkaround, not just digitizes it.",
+    languages: allLanguages,
+    summary: "The rollover protective structure protects the space around you only when the belt keeps you inside that space.",
+    objective: "Use the seatbelt correctly before engine start and understand the moving-machine alert.",
+    keySteps: ["Fasten and check the belt before moving", "Do not bypass belt switches", "Stop safely if a belt warning appears", "Report damaged belts or buckles"],
+    standardRef: "OSHA 29 CFR 1926.602; ISO 3471 (ROPS); ISO 6683 (seatbelts)",
     downloadedOffline: true,
     videoUri: null,
   },
@@ -119,30 +96,242 @@ export const trainingLibrary: Lesson[] = [
     id: "reading-task-cards",
     title: "Reading Your Daily Task Card",
     category: "onboarding",
-    durationMin: 3,
-    languages: ["en", "hi", "ta"],
-    summary:
-      "What each part of a task card means — dig depth, hazard callouts, P50/P90 time range — and how to use the voice read-out without taking your hands off the controls.",
+    level: "beginner",
+    durationMin: 4,
+    languages: allLanguages,
+    summary: "Understand task location, depth, hazards, weather, P50/P90 time range and the voice read-out before you begin.",
+    objective: "Turn a work order into a clear, safe plan.",
+    keySteps: ["Confirm what, where and how deep", "Read hazard callouts aloud if needed", "Treat P90 as planning support, not pressure", "Ask when instructions conflict with site conditions"],
+    downloadedOffline: true,
+    videoUri: null,
+  },
+  {
+    id: "reading-blind-spots",
+    title: "Reading Your Machine's Blind Spots",
+    category: "safety",
+    level: "foundation",
+    durationMin: 6,
+    languages: allLanguages,
+    summary: "Excavators, loaders and dozers lose sight of different areas. Learn where cameras help and where a spotter is still essential.",
+    objective: "Identify blind zones before swing, travel, reverse or loading work.",
+    keySteps: ["Know your machine's blind-spot map", "Scan mirrors and cameras before movement", "Use an agreed spotter signal", "Stop immediately when you lose sight of a person"],
+    standardRef: "ISO 5006 (operator field of view)",
+    downloadedOffline: true,
+    videoUri: null,
+  },
+  {
+    id: "proximity-alert-levels",
+    title: "Amber and Red: Understanding Proximity Alerts",
+    category: "safety",
+    level: "foundation",
+    durationMin: 4,
+    languages: allLanguages,
+    summary: "Learn what the alert colours mean, why the safety envelope grows in poor conditions, and why alerts require action instead of dismissal.",
+    objective: "Respond consistently to amber and red proximity warnings.",
+    keySteps: ["Amber: slow, scan and create space", "Red: stop dangerous motion immediately", "Check people, ground and attachment path", "Report repeated false alerts for inspection"],
+    standardRef: "ISO 16001; ISO 21815 (proximity/collision warning systems)",
+    downloadedOffline: true,
+    videoUri: null,
+  },
+  {
+    id: "reversing-safely",
+    title: "Reversing Safely: Blind Spot and Spotter Protocol",
+    category: "safety",
+    level: "foundation",
+    durationMin: 5,
+    languages: allLanguages,
+    summary: "A repeatable reverse routine: stop, scan, sound warning, confirm the route and stop if the spotter disappears from view.",
+    objective: "Reverse only when the route and people around it are controlled.",
+    keySteps: ["Check route, cameras and mirrors", "Sound warning as required by site rules", "Agree signals with the spotter", "Never reverse toward an unseen person"],
+    standardRef: "ISO 5006; ISO 21815",
+    downloadedOffline: false,
+    videoUri: null,
+  },
+  {
+    id: "ground-and-travel",
+    title: "Ground, Slopes and Travel Stability",
+    category: "safety",
+    level: "foundation",
+    durationMin: 6,
+    languages: allLanguages,
+    summary: "Recognise soft shoulders, trenches, buried voids, uneven ground and slopes before travelling or positioning the machine.",
+    objective: "Choose a stable route and stop before a rollover risk develops.",
+    keySteps: ["Inspect the route on foot where safe", "Keep loads and attachments low while travelling", "Follow machine/manual limits for slopes", "Stay clear of unsupported trench edges"],
+    downloadedOffline: false,
+    videoUri: null,
+  },
+  {
+    id: "utilities-and-excavation",
+    title: "Excavation Near Utilities",
+    category: "safety",
+    level: "foundation",
+    durationMin: 7,
+    languages: allLanguages,
+    summary: "Before digging, verify markings, exclusion zones, permit conditions and escalation steps for suspected buried services.",
+    objective: "Prevent strikes to power, gas, water, fibre and other buried utilities.",
+    keySteps: ["Review utility plans and markings", "Respect exclusion zones and permit conditions", "Use approved exposure methods", "Stop immediately if an unmarked service is found"],
+    downloadedOffline: true,
+    videoUri: null,
+  },
+  {
+    id: "monsoon-conditions",
+    title: "Working Safely in Rain and Low Visibility",
+    category: "safety",
+    level: "foundation",
+    durationMin: 5,
+    languages: allLanguages,
+    summary: "Rain changes traction, visibility, ground bearing capacity and stopping distance. Learn when to slow down, reduce load and pause work.",
+    objective: "Adapt operation to weather instead of treating every shift as dry and clear.",
+    keySteps: ["Reduce speed and increase separation", "Recheck soft ground and slopes", "Keep windows/cameras clear", "Stop work when visibility or stability is unsafe"],
+    downloadedOffline: false,
+    videoUri: null,
+  },
+  {
+    id: "communication-and-exclusion-zones",
+    title: "Working Around People: Signals and Exclusion Zones",
+    category: "safety",
+    level: "foundation",
+    durationMin: 5,
+    languages: allLanguages,
+    summary: "Set clear boundaries before work starts and use one agreed signal system with ground crew, truck drivers and spotters.",
+    objective: "Prevent people and machines entering the same uncontrolled space.",
+    keySteps: ["Confirm who is the designated spotter", "Set a visible exclusion zone", "Use clear stop signals", "Stop when communication is unclear"],
+    downloadedOffline: false,
+    videoUri: null,
+  },
+  {
+    id: "efficient-dig-cycles",
+    title: "Efficient Dig Cycles: Boom, Stick and Bucket Timing",
+    category: "skill",
+    level: "practice",
+    durationMin: 8,
+    languages: allLanguages,
+    summary: "Practise the four phases of a dig cycle: dig, swing-load, dump and swing-return. Smooth control is safer and more efficient than rushing.",
+    objective: "Build a repeatable, smooth cycle under trainer supervision.",
+    keySteps: ["Position correctly before digging", "Avoid unnecessary swing distance", "Coordinate controls smoothly", "Finish each cycle ready for the next one"],
+    standardRef: "CAT Performance Handbook cycle-time methodology",
+    downloadedOffline: true,
+    videoUri: null,
+  },
+  {
+    id: "loading-trucks-safely",
+    title: "Loading Trucks: Position, Sequence and Communication",
+    category: "skill",
+    level: "practice",
+    durationMin: 7,
+    languages: allLanguages,
+    summary: "Practise stable truck positioning, controlled bucket travel and clear coordination with drivers and ground crew.",
+    objective: "Load consistently without swinging over people or creating unstable loads.",
+    keySteps: ["Confirm truck position and exclusion zone", "Keep bucket movement controlled", "Load to the approved sequence", "Stop if the driver or spotter leaves the safe position"],
+    downloadedOffline: false,
+    videoUri: null,
+  },
+  {
+    id: "idle-intent-and-fairness",
+    title: "Idle Intent: Record the Real Reason",
+    category: "efficiency",
+    level: "beginner",
+    durationMin: 4,
+    languages: allLanguages,
+    summary: "Learn the difference between productive standby and avoidable idle, and how to record a truck wait or site delay so it is not blamed on you.",
+    objective: "Use idle tagging as evidence and improve fuel use without hiding real site problems.",
+    keySteps: ["Tag truck waits and warm-up accurately", "Use the prompt only at a safe pause", "Do not tag while moving", "Raise repeated bottlenecks with the supervisor"],
+    downloadedOffline: true,
+    videoUri: null,
+  },
+  {
+    id: "fuel-and-machine-care",
+    title: "Fuel-Smart Operation and Machine Care",
+    category: "efficiency",
+    level: "foundation",
+    durationMin: 5,
+    languages: allLanguages,
+    summary: "Smooth cycles, correct warm-up, planned pauses and early defect reporting reduce unnecessary fuel burn and avoidable wear.",
+    objective: "Recognise efficient operation without sacrificing safety or output quality.",
+    keySteps: ["Avoid high-RPM waiting", "Use smooth control inputs", "Report leaks and temperature warnings early", "Follow manufacturer cool-down and service guidance"],
+    downloadedOffline: false,
+    videoUri: null,
+  },
+  {
+    id: "near-miss-autopilot",
+    title: "Near-Miss Autopilot: What Happens After a Close Call",
+    category: "compliance",
+    level: "foundation",
+    durationMin: 4,
+    languages: allLanguages,
+    summary: "The app captures the event context for you. Learn how to confirm or correct a draft safely, and why reporting helps prevent the next incident.",
+    objective: "Use near-miss reporting without added paperwork or blame.",
+    keySteps: ["Let the draft capture the context", "Confirm or dismiss only when stationary", "Use voice when touch would be unsafe", "Add a short note if conditions need explaining"],
+    downloadedOffline: true,
+    videoUri: null,
+  },
+  {
+    id: "emergency-response",
+    title: "Emergency Response: Stop, Secure, Communicate",
+    category: "safety",
+    level: "foundation",
+    durationMin: 6,
+    languages: allLanguages,
+    summary: "A calm first response for alarms, contact with an obstacle, fire, rollover risk, utility strike or injury: stop work, secure the machine and follow site emergency procedure.",
+    objective: "Know the first safe actions while waiting for trained emergency support.",
+    keySteps: ["Stop and secure the machine", "Warn others and use the site emergency channel", "Do not improvise rescue or repairs", "Preserve the area when it is safe to do so"],
+    downloadedOffline: true,
+    videoUri: null,
+  },
+  {
+    id: "end-of-shift-handover",
+    title: "End-of-Shift Log and Handover",
+    category: "compliance",
+    level: "beginner",
+    durationMin: 4,
+    languages: allLanguages,
+    summary: "Review the prefilled hours, fuel, loads, task status and defect notes so the next operator starts with a reliable handover.",
+    objective: "Leave a machine, task record and work area ready for the next shift.",
+    keySteps: ["Park and secure according to site procedure", "Review auto-filled shift data", "Add defects and hazards clearly", "Hand over urgent issues directly"],
     downloadedOffline: true,
     videoUri: null,
   },
   {
     id: "ghost-operator-scoring",
-    title: "Ghost Operator: How Scoring Works",
+    title: "Ghost Operator: How Practice Scoring Works",
     category: "skill",
-    durationMin: 4,
-    languages: ["en", "hi", "ta"],
-    summary:
-      "Cycle time, smoothness (jerk), fuel per cycle, and idle seconds — what each scored metric means and how closing the gap with the ghost actually tightens your personal task-time estimates.",
+    level: "practice",
+    durationMin: 5,
+    languages: allLanguages,
+    summary: "See how cycle time, smoothness, fuel per cycle, idle time and safety decisions are compared with an expert reference trace.",
+    objective: "Use simulator feedback as coaching, not a public ranking.",
+    keySteps: ["Start with safety before speed", "Review one score at a time", "Repeat the scenario with one improvement goal", "Track progress against your own prior result"],
     downloadedOffline: false,
     videoUri: null,
   },
 ];
 
+/** A supervised new operator can follow this order in their first week. */
+export const beginnerPathLessonIds = [
+  "welcome-to-operatoros",
+  "cab-controls-and-visibility",
+  "safe-entry-exit",
+  "pre-start-checklist-walkthrough",
+  "seatbelt-rops-5s",
+  "reading-task-cards",
+  "reading-blind-spots",
+  "proximity-alert-levels",
+  "communication-and-exclusion-zones",
+  "ground-and-travel",
+  "near-miss-autopilot",
+  "end-of-shift-handover",
+];
+
+export function beginnerPath(): Lesson[] {
+  return beginnerPathLessonIds
+    .map((id) => trainingLibrary.find((lesson) => lesson.id === id))
+    .filter((lesson): lesson is Lesson => lesson !== undefined);
+}
+
 export function lessonsByCategory(category: LessonCategory): Lesson[] {
-  return trainingLibrary.filter((l) => l.category === category);
+  return trainingLibrary.filter((lesson) => lesson.category === category);
 }
 
 export function downloadedLessons(): Lesson[] {
-  return trainingLibrary.filter((l) => l.downloadedOffline);
+  return trainingLibrary.filter((lesson) => lesson.downloadedOffline);
 }

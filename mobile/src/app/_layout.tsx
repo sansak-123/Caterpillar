@@ -11,6 +11,24 @@ export default function RootLayout() {
       <StatusBar style={colors.mode === "light" ? "dark" : "light"} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="checklist"
+          options={{
+            headerShown: true,
+            title: "Pre-Start Checklist",
+            headerStyle: { backgroundColor: colors.surface },
+            headerTintColor: colors.textPrimary,
+          }}
+        />
+        <Stack.Screen
+          name="shift-log"
+          options={{
+            headerShown: true,
+            title: "End-of-Shift Log",
+            headerStyle: { backgroundColor: colors.surface },
+            headerTintColor: colors.textPrimary,
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

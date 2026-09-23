@@ -64,14 +64,17 @@ As a trainee closes the gap, their measured skill factor updates and feeds the t
 
 **USP-2 Near-Miss Autopilot.** The system passively detects near-miss signatures
 (person inside amber/red zone while swinging or reversing; travel with belt unfastened; hard stop
-after proximity alert) and creates a DRAFT incident automatically. Operator confirms with one tap
-or one spoken word. Each confirmed near-miss becomes a replayable Unity scenario
-("every near-miss becomes a lesson"). Links outcome 2 ↔ 3 ↔ 4.
+after proximity alert) and creates a DRAFT incident automatically. Confirmation is a tap or a
+spoken word, and **it waits for the machine to be stationary** (see §2.1 Rule 1) — voice
+confirmation is available anytime, since it doesn't require looking at or touching the screen.
+Each confirmed near-miss becomes a replayable Unity scenario ("every near-miss becomes a
+lesson"). Links outcome 2 ↔ 3 ↔ 4.
 
 **USP-3 Idle Intent Tagging.** Hour meters cannot tell productive standby from waste. When idle
-exceeds 3 min, the app asks one-tap "why?" (waiting for truck / warm-up / break / other).
-Anomaly detection then separates operator behaviour from site-planning problems
-(e.g. truck bottleneck) — detection without blame.
+exceeds 3 min, the app asks one-tap "why?" (waiting for truck / warm-up / break / other) — framed
+to the operator as **"tap this and it's on record the delay wasn't your fault,"** not as
+surveillance (see §2.1 Rule 3). Anomaly detection then separates operator behaviour from
+site-planning problems (e.g. truck bottleneck) — detection without blame.
 
 **USP-4 Condition-adaptive safety envelope.** Proximity zone radii scale with visibility,
 rain, wind, reverse/swing state and machine class. Working conditions feed safety, not just
@@ -80,6 +83,92 @@ estimates.
 **USP-5 Offline-first, safety-never-waits.** All safety logic runs on the in-cab mobile device
 with zero network dependency, using on-device sensors (GPS, motion) where the phone/tablet
 provides them natively. Cloud is for learning, fleet view and sync.
+
+**USP-6 Whole-Machine Safety Intelligence.** The original safety scope was "don't hit a person":
+seatbelt + proximity + near-miss. This reframes it to "the machine and the operator are both
+being watched for failure modes," using telemetry fields the system already generates but that
+previously only fed the task-time model:
+- **Fatigue & alertness** — `operator_fatigue_score_at_start`, hours-awake and consecutive night
+  shifts (already computed, NIOSH-grounded per section 5) become an active safety signal with a
+  break recommendation, not just a hidden multiplier on a time estimate.
+- **Machine health as a safety signal** — hydraulic pressure, hydraulic oil/coolant temperature,
+  DEF level and active fault codes (already in `telemetry_1min`) are surfaced live; mechanical
+  failure (hydraulic loss, overheating) is a real injury cause, not just a maintenance-scheduling
+  concern.
+- **Slope/rollover stability** — `slope_pct` (already in `telemetry_1min`, currently unused
+  anywhere) is checked against a safe operating angle grounded in ISO 3471 ROPS static stability
+  testing; operating beyond it is flagged before it becomes a rollover.
+- **Operator responsiveness ("are you OK?") check** — engine on, seatbelt fastened, but zero
+  control input across travel/swing/boom/stick/bucket for an abnormally long stationary period
+  (longer than a normal idle/break) can indicate a medical event, not just downtime. A soft,
+  voice-answerable check-in fires; no response within a short window escalates to the supervisor
+  view. This is a software-only "dead-man's switch," using signals already collected.
+
+None of this needed new data generation — every input already exists in `telemetry_1min.parquet`
+and `tasks.csv`; it was simply never read for safety purposes before. Links outcomes 2 ↔ 4.
+
+### 2.1 Operator trust & adoption principles (non-negotiable design constraints)
+
+Every feature above is designed to help the operator, not just management. But surveillance-
+shaped features (idle detection, anomaly flags, supervisor dashboards), attention-competing UI
+(pop-ups, confirm buttons, radar screens) on a moving 20-ton machine, alert fatigue, and added
+paperwork are exactly how a genuinely useful safety tool gets ignored or defeated in the field.
+None of this has been validated with a real operator — it is reasoned from research and
+assumptions, and that limitation should be said plainly in the pitch, not hidden. The following
+rules exist to keep the product operator-first in practice, not just in marketing, and every
+later phase must respect them:
+
+- **Rule 1 — Never require screen input while the machine is moving.** Like a car's infotainment
+  lockout, touch input is only accepted when `travel_kmh ≈ 0 && swing_rate_dps ≈ 0` (stationary).
+  While the machine is moving, the app communicates outward only — sound, haptics, and large color
+  states — never inward. Near-miss confirmations queue and surface at the next stop; voice
+  confirmation is the one input channel available anytime, since it doesn't require looking away
+  or taking a hand off the controls. This is a hard gate in `lib/safety`, not a UI convention —
+  the device rejects/defers tap-based confirmations programmatically while moving.
+- **Rule 2 — The operator sees their own data first, privately.** Personal stats (idle ratio,
+  near-miss history, skill factor) go to the operator as private coaching, not a public score.
+  Supervisors see site-level patterns and near-miss hotspots — aggregated, not framed as
+  per-operator blame. Near-miss data shared upward is anonymized to "a near-miss occurred" plus
+  context, not "operator X did this," unless the operator themself confirms/annotates it.
+- **Rule 3 — Idle Intent is the operator's proof, not the company's monitor — but still
+  answerable.** The one-tap idle reason is framed and copywritten as protection ("this is on
+  record as a truck-wait delay, not your fault"), never as "explain yourself," and a single tag
+  is always taken at face value to the operator — never an on-the-spot challenge. Protective
+  framing isn't the same as no accountability, though: each tag is silently checked against
+  corroborating telemetry (e.g. `truck_wait` against `nearby_machines_count`/
+  `queue_position_estimate`, `warmup` against whether it's the shift's first idle window). A
+  single mismatch is never surfaced or held against anyone; only a *pattern* across enough tagged
+  windows (see `reasonReliabilitySummary` in `lib/safety/idleIntent.ts`) reaches a supervisor, and
+  even then it's phrased as worth a conversation, not a verdict — per §2.1 Rule 2, a pattern, not
+  a per-incident flag. This is what keeps the feature genuinely useful rather than a rubber stamp:
+  good for the operator by default, but not a free pass.
+- **Rule 4 — Fewer, smarter alerts.** Only red-zone proximity and seatbelt-while-moving are loud,
+  interrupting alerts. Everything else (idle nudges, sync status, training reminders) waits for a
+  natural pause and is quiet/non-blocking. No repeated re-alerting for the same condition within a
+  short window — once acknowledged, exponential backoff before it can fire again. Alert fatigue is
+  a safety failure mode, not just an annoyance.
+- **Rule 5 — Remove paperwork instead of adding tasks.** Every operator-facing feature should
+  ideally remove work, not add it. Two concrete features exist specifically for this (full specs
+  in section 6): a **digital pre-start walkaround checklist** replacing a paper one, and an
+  **automatic end-of-shift log** that pre-fills hours/fuel/loads/tasks from telemetry the system
+  already has, leaving the operator only to review and sign. The pitch line this earns: "we
+  eliminate ~20 minutes of daily paperwork," not just "we also ask you to do more taps."
+- **Rule 6 — Task instructions must be genuinely usable, not just present.** Task cards state what
+  to dig, where, how deep, and known hazards (buried utilities, slopes, nearby workers) — with a
+  voice read-out in the operator's own language (en/hi/ta). Unclear task instructions are a real,
+  frequently-cited daily frustration, not a hypothetical.
+
+| Feature | What the operator actually gets |
+|---|---|
+| Condition-adaptive safety zones | Protection from hazards they physically can't see |
+| Seatbelt alert | Survives a rollover |
+| Near-Miss Autopilot | Close calls get recorded without paperwork or blame |
+| Idle Intent Tagging | Proof a delay wasn't their fault |
+| P50/P90 time ranges | Fair targets that account for weather and machine condition, not a stopwatch used against them |
+| Ghost Operator | Faster skill growth → better pay and confidence |
+| Auto end-of-shift log + digital pre-start checklist | Less paperwork, earlier finish |
+| Voice + Hindi/Tamil throughout | Hands stay on the controls, instructions in their own language |
+| Offline mode | A tool that keeps working where signal doesn't |
 
 Demo narrative arc (build the scripted demo around this):
 10:00 seatbelt off + idle spike → idle intent prompt → worker enters blind-spot zone during swing
@@ -101,7 +190,7 @@ MACHINE SIDE (simulated)                IN-CAB EDGE DEVICE (Android/iOS tablet, 
 │ scripted demo scenes  │             │ Task-time ONNX (onnxruntime-react-    │         │ LightGBM + SHAP      │
 └──────────────────────┘             │   native)                             │         │ IsolationForest      │
      Mosquitto broker                  │ Near-miss detector (TS)               │         │ Near-miss analytics  │
-     (site gateway, TCP 1883 +          │ WatermelonDB (SQLite) + outbox        │         │ Claude API assistant │
+     (site gateway, TCP 1883 +          │ WatermelonDB (SQLite) + outbox        │         │ OpenRouter assistant │
       WS 9001)                         │ Background sync (expo-task-manager)   │         │ Model registry (ONNX)│
                                        │ Unity (native AAR/iOS framework)       │         │ Supervisor dashboard │
                                        │   embedded via native RN view          │         └─────────────────────┘
@@ -153,7 +242,7 @@ MACHINE SIDE (simulated)                IN-CAB EDGE DEVICE (Android/iOS tablet, 
   runs locally with onnxruntime-react-native. Day plan is pre-scored with full SHAP
   explanations at morning sync; offline re-scoring uses ONNX and marks explanation
   "approximate (offline)".
-- **Assistant:** online → Claude API via backend. Offline → intent matcher + MiniSearch over
+- **Assistant:** online → a hosted LLM via OpenRouter, called from the backend. Offline → intent matcher + MiniSearch over
   cached safety cards, SOPs, and training snippets (bundled in the app + refreshed via sync). UI
   shows which mode is active.
 - **UI:** a persistent connectivity pill (Online / Offline · N queued / Syncing) and a demo
@@ -185,7 +274,7 @@ MACHINE SIDE (simulated)                IN-CAB EDGE DEVICE (Android/iOS tablet, 
 | Backend | FastAPI, SQLAlchemy 2.0, pydantic v2, Alembic |
 | DB | PostgreSQL 16 + TimescaleDB (hypertable for telemetry) |
 | ML | pandas, numpy, LightGBM (quantile), SHAP, scikit-learn (IsolationForest), onnxmltools/skl2onnx |
-| Assistant | Anthropic Python SDK (check docs.claude.com for current model IDs; fast/cheap model for incident structuring, stronger model for explanations); voice via `expo-speech` (TTS) + `@react-native-voice/voice` or a cloud STT fallback |
+| Assistant | OpenRouter (OpenAI-compatible `/chat/completions` API, called via the `openai` Python SDK pointed at OpenRouter's base URL) — a free/low-cost model for incident structuring, a stronger (still free-tier where possible) model for explanations; the exact model slugs are a config value (`OPENROUTER_FAST_MODEL`/`OPENROUTER_STRONG_MODEL`), not hardcoded, since OpenRouter's free-tier catalog changes; voice via `expo-speech` (TTS) + `@react-native-voice/voice` or a cloud STT fallback |
 | Offline search | MiniSearch (pure JS, runs fine in RN's JS engine) |
 | i18n | `react-i18next` + `expo-localization` — English, Hindi, Tamil |
 | Infra | Docker Compose: `db`, `mqtt`, `api`, `simulator` (the mobile app itself runs via Expo/EAS on device or emulator, not containerized) |
@@ -267,17 +356,46 @@ each be traceable to a plain-language SHAP reason string, not just raw model inp
 ## 6. Module specs
 
 **Task dashboard:** today's tasks per operator with P50 & P90 minutes, weather badge, risk badge,
-reorder, start/pause/complete; actual minutes recorded automatically from telemetry state.
+reorder, start/pause/complete; actual minutes recorded automatically from telemetry state. Each
+task card states what to dig, where, how deep, and known hazards (buried utilities, slopes,
+nearby workers), with a voice read-out in the operator's language (§2.1 Rule 6) — task cards are
+not just a schedule, they're the instruction sheet.
 
 **Safety engine (device, TS, pure functions, unit-tested with Jest):**
 - `seatbelt`: alert if engine_on && (travel_kmh > 0.5 || swing_rate > 5) && seatbelt == unfastened
   for > 5 s. Soft reminder when engine_on && unfastened && idle.
 - `proximity`: zone radii = base(machine_class) × condition_factor(visibility, precip, wind)
   × state_factor(swing, reverse). Red → loud alert + haptic (`expo-haptics`); amber → chime.
-  Rear sector weighted higher (blind spot).
+  Rear sector weighted higher (blind spot). Per §2.1 Rule 4, only the red-zone and
+  seatbelt-while-moving alerts are loud/interrupting; nothing else is, and no alert re-fires for
+  the same standing condition within a backoff window.
 - `near_miss`: red-zone entry during swing/reverse, or belt-off travel, or hard-stop within
   2 s of a proximity alert → draft incident in WatermelonDB/SQLite + outbox.
+- `input_lockout` (§2.1 Rule 1, hard gate — not just a UI convention): `is_stationary =
+  travel_kmh < 0.3 && swing_rate_dps < 2`. Tap-based confirmations (near-miss confirm/dismiss,
+  idle-intent chip) are only accepted when `is_stationary`; while moving, a pending confirmation
+  queues and the UI can only ever communicate outward (sound/haptic/color), never solicit a tap.
+  Voice confirmation bypasses the lockout entirely — it's the one channel safe to use while
+  operating controls.
 - Working conditions panel: heat index, rain, wind, visibility, shift hours elapsed.
+- `fatigue_alert` (USP-6): derives a 0-1 risk from `operator_fatigue_score_at_start`, elapsed
+  shift time, and consecutive night shifts (same NIOSH-grounded curve as section 5). Caution
+  above ~0.6, recommends a break; danger above ~0.85. Quiet/non-blocking per §2.1 Rule 4 — a
+  private coaching card (§2.1 Rule 2), never a supervisor-visible score.
+- `machine_health_alert` (USP-6): flags on `hydraulic_pressure_bar` outside its normal working
+  band, `hydraulic_oil_temp_c`/`coolant_temp_c` above a warning threshold, `def_level_pct` below
+  ~10%, `fault_code_active`, or `hours_since_last_service` past `service_interval_hrs`. Each flag
+  names the specific reading and threshold crossed (`{value, range, reasons[]}`, section 8) —
+  never just "machine issue."
+- `slope_alert` (USP-6): flags when `slope_pct` exceeds a safe operating angle for the machine
+  class, grounded in ISO 3471 ROPS static stability testing methodology (documented assumption +
+  exact per-class threshold in `data/calibration.md`); the safe threshold tightens further on wet/
+  soft ground (`ground_moisture_pct` high) or high `payload_kg`.
+- `responsiveness_check` (USP-6, "are you OK?"): engine_on && seatbelt fastened && travel_kmh ≈ 0
+  && swing_rate_dps ≈ 0 && no boom/stick/bucket motion for longer than a normal idle/break window
+  → a soft, voice-answerable check-in (never a tap-only prompt, since inability to tap could be
+  the very problem). No response within a short timeout escalates to the supervisor view as a
+  welfare check, not a discipline flag.
 
 **Unusual behaviour (two tiers):**
 - Device: rolling 15-min idle ratio vs operator baseline (z-score > 2) and absolute threshold;
@@ -285,6 +403,23 @@ reorder, start/pause/complete; actual minutes recorded automatically from teleme
 - Cloud: IsolationForest on 15-min window features + per-operator baselines; weekly report
   separating "operator habit" vs "site bottleneck" using idle intent tags. Every flag carries a
   plain-language reason string.
+- Privacy (§2.1 Rule 2): an operator's own anomaly/idle history is visible to that operator as
+  private coaching. Supervisor views show site-level aggregates and hotspots, not a per-operator
+  scoreboard; a near-miss surfaced to a supervisor reads as "a near-miss occurred, here's the
+  context," not attributed as an individual's fault unless that operator has confirmed/annotated
+  it themself.
+
+**Digital pre-start checklist (§2.1 Rule 5 — replaces a paper walkaround).** A short guided
+checklist before the shift starts (visual inspection items, PPE, machine condition) — one tap per
+item, big touch targets, available offline. `pre_start_checklist_completed` already exists as a
+tracked field in the tasks schema (section 5.1); this feature is what actually sets it from a real
+operator action instead of being a synthetic label. Feeds `ppe_compliance_flag` too.
+
+**Automatic end-of-shift log (§2.1 Rule 5 — the other paperwork-removal feature).** Hours, fuel
+used, load cycles and tasks completed are already in the shift's telemetry — this view assembles
+them into a daily report automatically. The operator reviews and signs rather than filling it in
+from memory. This is the concrete basis for the "we eliminate ~20 minutes of daily paperwork"
+pitch line; it should be demoable, not just described.
 
 **Task time estimation:** target = actual/est overrun ratio. LightGBM quantile models
 (alpha 0.5 and 0.9). Features: task_type, skill, measured_skill_score (from training),
@@ -294,14 +429,16 @@ idle ratio, operator fatigue score, previous task overrun ratio, site congestion
 Baseline = planner estimate. Report MAE on minutes vs baseline and P90 coverage.
 Export to ONNX. SHAP top-3 factors as human sentences ("+9 min: rain", "+6 min: beginner").
 
-**Training hub:** video library (downloadable for offline via `expo-file-system`), instructor
-booking (slots, offline request queued), Unity simulator: scenarios `TrenchNearWorkers`,
-`LoadingInRain`, `IdleDiscipline`, `GhostOperator`, `NearMissReplay(event_json)`. Scores posted to
-backend; assignments come from anomaly + near-miss engines.
+**Training hub:** a real content library (`mobile/src/content/trainingLibrary.ts` — curated
+lessons with real titles/summaries grounded in the same standards as section 5, not placeholder
+stat cards), downloadable for offline via `expo-file-system`; instructor booking (slots, offline
+request queued); Unity simulator: scenarios `TrenchNearWorkers`, `LoadingInRain`,
+`IdleDiscipline`, `GhostOperator`, `NearMissReplay(event_json)`. Scores posted to backend;
+assignments come from anomaly + near-miss engines.
 
 **Assistant:** voice/text. Intents: log incident, explain estimate, safety question,
-"why was I flagged", book instructor. Online: Claude structures free speech into incident JSON
-matching `IncidentSchema`. Offline: intent matcher + MiniSearch KB.
+"why was I flagged", book instructor. Online: an OpenRouter-hosted model structures free speech
+into incident JSON matching `IncidentSchema`. Offline: intent matcher + MiniSearch KB.
 
 ---
 
@@ -351,7 +488,7 @@ operator-os/
 - Seed row 2025-05-01 10:00 MUST trigger seatbelt + idle alerts in both TS and Python tests.
 - Every ML output returns `{value, range, reasons[]}`.
 - Env vars via `.env` (backend) and `app.config.ts` / EAS secrets (mobile); never commit keys.
-  `ANTHROPIC_API_KEY` only on backend.
+  `OPENROUTER_API_KEY` only on backend.
 - Small commits per completed sub-task, conventional commit messages.
 - When unsure about an industrial assumption, write it in calibration.md as an assumption.
 

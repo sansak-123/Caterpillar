@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -8,7 +9,12 @@ import { GlassCard } from "../components/GlassCard";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ProgressRing } from "../components/ProgressRing";
 import { ScreenBackground } from "../components/ScreenBackground";
-import { downloadedLessons, trainingLibrary, type Lesson, type LessonCategory } from "../content/trainingLibrary";
+import {
+  beginnerPath,
+  trainingLibrary,
+  type Lesson,
+  type LessonCategory,
+} from "../content/trainingLibrary";
 import { useColors } from "../theme/useColors";
 import { radius, spacing, type } from "../theme/tokens";
 
@@ -56,6 +62,8 @@ const scenarios: Scenario[] = [
 
 export function TrainingScreen() {
   const colors = useColors();
+  const firstWeekPath = beginnerPath();
+  const [showRefreshers, setShowRefreshers] = useState(false);
 
   return (
     <ScreenBackground>
@@ -112,24 +120,41 @@ export function TrainingScreen() {
           </View>
 
           <View style={[styles.rowBetween, { marginTop: spacing.sm }]}>
-            <Text style={[type.h2, { color: colors.textPrimary }]}>Lesson library</Text>
+            <Text style={[type.h2, { color: colors.textPrimary }]}>New operator pathway</Text>
             <Text style={[type.caption, { color: colors.textMuted }]}>
-              {trainingLibrary.length} lessons · {downloadedLessons().length} downloaded
+              {firstWeekPath.length} lessons · first week
             </Text>
           </View>
+          <Card accentColor={colors.info}>
+            <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>Learn before independent operation</Text>
+            <Text style={[type.body, { color: colors.textMuted }]}>
+              Complete this guided path with your trainer. The machine manual and site procedure always come first.
+            </Text>
+          </Card>
           <View style={styles.scenarioList}>
-            {trainingLibrary.slice(0, 4).map((lesson, i) => (
+            {firstWeekPath.map((lesson, i) => (
               <Animated.View key={lesson.id} entering={FadeInDown.delay(420 + i * 60).duration(400)}>
                 <LessonRow lesson={lesson} colors={colors} />
               </Animated.View>
             ))}
           </View>
           <PrimaryButton
-            label={`See all ${trainingLibrary.length} lessons`}
-            onPress={() => {}}
+            label={showRefreshers ? "Hide practice and refresher lessons" : `Show ${trainingLibrary.length - firstWeekPath.length} more lessons`}
+            onPress={() => setShowRefreshers((shown) => !shown)}
             variant="secondary"
             fullWidth={false}
           />
+          {showRefreshers ? (
+            <View style={styles.scenarioList}>
+              {trainingLibrary
+                .filter((lesson) => !firstWeekPath.some((starter) => starter.id === lesson.id))
+                .map((lesson, i) => (
+                  <Animated.View key={lesson.id} entering={FadeInDown.delay(i * 60).duration(350)}>
+                    <LessonRow lesson={lesson} colors={colors} />
+                  </Animated.View>
+                ))}
+            </View>
+          ) : null}
 
           <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Book an instructor</Text>
           <Card>
@@ -154,6 +179,13 @@ function LessonRow({ lesson, colors }: { lesson: Lesson; colors: ReturnType<type
       </View>
       <Text style={[type.body, { color: colors.textMuted }]} numberOfLines={2}>
         {lesson.summary}
+      </Text>
+      <View style={styles.objectiveBox}>
+        <Text style={[type.caption, { color: colors.textMuted }]}>YOU WILL LEARN</Text>
+        <Text style={[type.caption, { color: colors.textPrimary }]}>{lesson.objective}</Text>
+      </View>
+      <Text style={[type.caption, { color: colors.textMuted }]} numberOfLines={2}>
+        Key steps: {lesson.keySteps.slice(0, 2).join(" · ")}
       </Text>
       <View style={styles.rowBetween}>
         <Text style={[type.caption, { color: colors.textMuted }]}>
@@ -199,5 +231,8 @@ const styles = StyleSheet.create({
   },
   scenarioList: {
     gap: spacing.sm,
+  },
+  objectiveBox: {
+    gap: 2,
   },
 });

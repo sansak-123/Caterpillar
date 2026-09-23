@@ -59,8 +59,7 @@ export function ProgressRing({
           strokeLinecap="round"
           strokeDasharray={circumference}
           animatedProps={animatedProps}
-          origin={`${size / 2}, ${size / 2}`}
-          rotation={-90}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </Svg>
       {value ? (
