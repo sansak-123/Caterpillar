@@ -1,28 +1,29 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { color, radius, spacing, type } from "../theme/tokens";
+import { useColors } from "../theme/useColors";
+import { radius, spacing, type } from "../theme/tokens";
 
 export type BadgeTone = "safe" | "caution" | "danger" | "info" | "neutral";
 
-const toneColor: Record<BadgeTone, string> = {
-  safe: color.safe,
-  caution: color.caution,
-  danger: color.danger,
-  info: color.info,
-  neutral: color.textSecondary,
-};
-
-const glowColor: Record<BadgeTone, string | null> = {
-  safe: color.safeGlow,
-  caution: color.cautionGlow,
-  danger: color.dangerGlow,
-  info: color.infoGlow,
-  neutral: null,
-};
-
 export function Badge({ label, tone = "neutral" }: { label: string; tone?: BadgeTone }) {
+  const colors = useColors();
+  const toneColor: Record<BadgeTone, string> = {
+    safe: colors.safe,
+    caution: colors.caution,
+    danger: colors.danger,
+    info: colors.info,
+    neutral: colors.textSecondary,
+  };
+  const glowColor: Record<BadgeTone, string | null> = {
+    safe: colors.safeGlow,
+    caution: colors.cautionGlow,
+    danger: colors.dangerGlow,
+    info: colors.infoGlow,
+    neutral: null,
+  };
   const tint = toneColor[tone];
   const glow = glowColor[tone];
+
   return (
     <View
       style={[

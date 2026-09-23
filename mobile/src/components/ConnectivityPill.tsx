@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from "react-native";
 
 import { useConnectivityStore } from "../store/connectivity";
-import { color, radius, shadow, spacing, type } from "../theme/tokens";
+import { useColors } from "../theme/useColors";
+import { radius, shadow, spacing, type } from "../theme/tokens";
 
 const labelFor = {
   online: "Online",
@@ -9,26 +10,18 @@ const labelFor = {
   syncing: "Syncing",
 } as const;
 
-const dotColorFor = {
-  online: color.online,
-  offline: color.offline,
-  syncing: color.syncing,
-} as const;
-
-const glowFor = {
-  online: color.safeGlow,
-  offline: color.dangerGlow,
-  syncing: color.cautionGlow,
-} as const;
-
 export function ConnectivityPill() {
+  const colors = useColors();
   const status = useConnectivityStore((s) => s.status);
   const queuedCount = useConnectivityStore((s) => s.queuedCount);
 
+  const dotColorFor = { online: colors.online, offline: colors.offline, syncing: colors.syncing } as const;
+  const glowFor = { online: colors.safeGlow, offline: colors.dangerGlow, syncing: colors.cautionGlow } as const;
+
   return (
-    <View style={styles.pill}>
+    <View style={[styles.pill, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
       <View style={[styles.dot, { backgroundColor: dotColorFor[status] }, shadow.glow(glowFor[status])]} />
-      <Text style={[type.caption, styles.text]}>
+      <Text style={[type.caption, { color: colors.textSecondary }]}>
         {labelFor[status]}
         {queuedCount > 0 ? ` · ${queuedCount} queued` : ""}
       </Text>
@@ -44,16 +37,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radius.pill,
-    backgroundColor: color.surfaceRaised,
     borderWidth: 1,
-    borderColor: color.border,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-  },
-  text: {
-    color: color.textSecondary,
   },
 });

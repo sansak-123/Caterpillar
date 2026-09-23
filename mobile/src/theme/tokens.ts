@@ -1,18 +1,99 @@
-// Design tokens for OperatorOS v2 — "premium dark," not flat industrial.
-// Dark stays the default (cab glare + night shifts is a real functional requirement,
-// not just a style choice), but with real depth: glass surfaces, soft glows, a
-// restrained accent instead of yellow-blocks-everywhere. Touch targets still meet the
-// 56px glove-friendly minimum from CLAUDE.md section 6.
+// Design tokens for OperatorOS v3 — CAT-branded, light-mode-first with a dark mode
+// toggle. Light is the default per direct design feedback (soft warm-white cards,
+// generous rounded corners, soft shadows, CAT yellow/black as the brand accent, not a
+// flat industrial dark app). Dark mode is kept as a full, equally-designed toggle for
+// the real functional case CLAUDE.md section 6 calls out — cab glare and night shifts
+// — not dropped, just no longer forced on everyone by default.
+//
+// Components read colors via `useColors()` (src/theme/useColors.ts), never this file's
+// exports directly, so every screen repaints correctly when the mode toggles.
 
-export const color = {
+export interface ColorTokens {
+  mode: "light" | "dark";
+  bg: string;
+  bgGlowTop: string;
+  glassFill: string;
+  glassBorder: string;
+  surface: string;
+  surfaceRaised: string;
+  border: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  accent: string;
+  accentOn: string;
+  accentGlow: string;
+  accentPressed: string;
+  primaryDark: string;
+  primaryDarkOn: string;
+  info: string;
+  infoGlow: string;
+  safe: string;
+  safeGlow: string;
+  caution: string;
+  cautionGlow: string;
+  danger: string;
+  dangerGlow: string;
+  online: string;
+  offline: string;
+  syncing: string;
+  ringTrack: string;
+}
+
+const catYellow = "#FFC72C"; // CAT-brand yellow
+const catBlack = "#1A1A1A"; // CAT-brand black, used as the solid primary-button color
+
+export const lightColors: ColorTokens = {
+  mode: "light",
+  bg: "#F6F4EF", // warm off-white, not stark white
+  bgGlowTop: "#FFF3D6", // subtle warm-yellow top-of-screen glow
+
+  // "insight"/hero tier — soft warm-tinted card, no blur needed on a light backdrop
+  glassFill: "#FFF7E2",
+  glassBorder: "rgba(255,199,44,0.35)",
+
+  // regular content cards — solid white, soft shadow does the elevation work
+  surface: "#FFFFFF",
+  surfaceRaised: "#EFEDE7",
+  border: "rgba(20,20,20,0.07)",
+
+  textPrimary: "#16171A",
+  textSecondary: "#5B5E66",
+  textMuted: "#8A8D94",
+
+  accent: catYellow,
+  accentOn: catBlack, // text/icon color when sitting on top of accent yellow
+  accentGlow: "rgba(255,199,44,0.45)",
+  accentPressed: "#E6B026",
+
+  primaryDark: catBlack, // the solid black pill (CTA) from the reference design
+  primaryDarkOn: "#FFFFFF",
+
+  info: "#3B6FE0",
+  infoGlow: "rgba(59,111,224,0.25)",
+
+  safe: "#15803D",
+  safeGlow: "rgba(21,128,61,0.22)",
+  caution: "#B45309",
+  cautionGlow: "rgba(180,83,9,0.22)",
+  danger: "#DC2626",
+  dangerGlow: "rgba(220,38,38,0.24)",
+
+  online: "#15803D",
+  offline: "#DC2626",
+  syncing: "#B45309",
+
+  ringTrack: "rgba(20,20,20,0.08)",
+};
+
+export const darkColors: ColorTokens = {
+  mode: "dark",
   bg: "#08090C",
-  bgGlowTop: "#151A2E", // used as the top stop of the screen backdrop gradient
+  bgGlowTop: "#151A2E",
 
-  // glass (hero/featured surfaces, paired with BlurView)
   glassFill: "rgba(255,255,255,0.05)",
   glassBorder: "rgba(255,255,255,0.10)",
 
-  // solid elevated (regular list/content cards — no blur, just soft shadow)
   surface: "#14161B",
   surfaceRaised: "#1C1F26",
   border: "rgba(255,255,255,0.08)",
@@ -21,11 +102,15 @@ export const color = {
   textSecondary: "#9BA3AF",
   textMuted: "#6B7280",
 
-  accent: "#FFC940", // CAT-adjacent yellow, used sparingly now (primary CTAs only)
-  accentGlow: "rgba(255,201,64,0.35)",
-  accentPressed: "#E6B330",
+  accent: catYellow,
+  accentOn: catBlack,
+  accentGlow: "rgba(255,199,44,0.35)",
+  accentPressed: "#E6B026",
 
-  info: "#7C9CFF", // premium supporting hue for native-feel glows / informational bits
+  primaryDark: "#F5F6F8",
+  primaryDarkOn: catBlack,
+
+  info: "#7C9CFF",
   infoGlow: "rgba(124,156,255,0.30)",
 
   safe: "#34D399",
@@ -38,7 +123,9 @@ export const color = {
   online: "#34D399",
   offline: "#FF5A5F",
   syncing: "#FB923C",
-} as const;
+
+  ringTrack: "rgba(255,255,255,0.10)",
+};
 
 export const spacing = {
   xs: 4,
@@ -70,15 +157,16 @@ export const type = {
 // Minimum interactive dimension for a gloved finger, per CLAUDE.md section 6.
 export const touchTarget = 56;
 
-// Shared soft-shadow presets so elevation reads consistently across solid cards.
+// Shared soft-shadow presets — same shape in both themes, just a darker shadow color
+// reads correctly on a light backdrop while a colored glow reads correctly on dark.
 export const shadow = {
-  card: {
+  card: (mode: "light" | "dark") => ({
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 6,
-  },
+    shadowOffset: { width: 0, height: mode === "light" ? 6 : 8 },
+    shadowOpacity: mode === "light" ? 0.08 : 0.35,
+    shadowRadius: mode === "light" ? 14 : 16,
+    elevation: 4,
+  }),
   glow: (glowColor: string) => ({
     shadowColor: glowColor,
     shadowOffset: { width: 0, height: 0 },

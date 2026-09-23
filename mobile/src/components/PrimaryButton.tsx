@@ -2,21 +2,10 @@ import * as Haptics from "expo-haptics";
 import { Pressable, StyleSheet, Text } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
-import { color, radius, shadow, spacing, touchTarget, type } from "../theme/tokens";
+import { useColors } from "../theme/useColors";
+import { radius, shadow, spacing, touchTarget, type } from "../theme/tokens";
 
-type Variant = "primary" | "secondary" | "danger";
-
-const backgroundFor: Record<Variant, string> = {
-  primary: color.accent,
-  secondary: color.surfaceRaised,
-  danger: color.danger,
-};
-
-const textColorFor: Record<Variant, string> = {
-  primary: "#1B1400",
-  secondary: color.textPrimary,
-  danger: "#2A0B0C",
-};
+type Variant = "primary" | "accent" | "secondary" | "danger";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -31,8 +20,25 @@ export function PrimaryButton({
   variant?: Variant;
   fullWidth?: boolean;
 }) {
+  const colors = useColors();
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  const backgroundFor: Record<Variant, string> = {
+    primary: colors.primaryDark,
+    accent: colors.accent,
+    secondary: colors.surfaceRaised,
+    danger: colors.danger,
+  };
+  const textColorFor: Record<Variant, string> = {
+    primary: colors.primaryDarkOn,
+    accent: colors.accentOn,
+    secondary: colors.textPrimary,
+    danger: "#FFFFFF",
+  };
+  const glowFor: Partial<Record<Variant, string>> = {
+    accent: colors.accentGlow,
+  };
 
   return (
     <AnimatedPressable
@@ -57,7 +63,7 @@ export function PrimaryButton({
         styles.button,
         fullWidth ? styles.fullWidth : null,
         { backgroundColor: backgroundFor[variant] },
-        variant === "primary" ? shadow.glow(color.accentGlow) : null,
+        glowFor[variant] ? shadow.glow(glowFor[variant]!) : shadow.card(colors.mode),
         animatedStyle,
       ]}
     >
@@ -69,7 +75,7 @@ export function PrimaryButton({
 const styles = StyleSheet.create({
   button: {
     minHeight: touchTarget,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.lg,
