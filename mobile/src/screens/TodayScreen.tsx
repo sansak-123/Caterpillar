@@ -18,7 +18,8 @@ import { ProgressRing } from "../components/ProgressRing";
 import { ScreenBackground } from "../components/ScreenBackground";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { PRE_START_CHECKLIST } from "../content/preStartChecklist";
-import { ensureDemoSession, fetchTasksToday, type ApiTask } from "../lib/api/client";
+import { fetchTasksToday, type ApiTask } from "../lib/api/client";
+import { appendToOutbox } from "../lib/sync/outbox";
 import { useAuthStore } from "../store/auth";
 import { useChecklistStore } from "../store/checklist";
 import { useConnectivityStore } from "../store/connectivity";
@@ -37,6 +38,7 @@ type Task = {
   risk: "safe" | "caution" | "danger";
   status: TaskStatus;
   hazards: string[];
+  version: number;
 };
 
 // Mock day plan mirroring the seed/demo scenario — Phase 4 will replace this with the
@@ -54,6 +56,7 @@ const mockTasks: Task[] = [
     risk: "safe",
     status: "in_progress",
     hazards: ["Buried fiber line, west edge"],
+    version: 1,
   },
   {
     id: "T002",
@@ -65,6 +68,7 @@ const mockTasks: Task[] = [
     risk: "caution",
     status: "pending",
     hazards: ["Soft ground after rain", "Workers on south side"],
+    version: 1,
   },
   {
     id: "T003",
@@ -76,6 +80,7 @@ const mockTasks: Task[] = [
     risk: "caution",
     status: "pending",
     hazards: ["Truck reversing zone"],
+    version: 1,
   },
   {
     id: "T005",
@@ -87,6 +92,7 @@ const mockTasks: Task[] = [
     risk: "danger",
     status: "pending",
     hazards: ["Overhead power line", "High wind — debris risk"],
+    version: 1,
   },
 ];
 
@@ -109,6 +115,7 @@ function mapApiTask(t: ApiTask): Task {
     risk,
     status,
     hazards: [],
+    version: t.version,
   };
 }
 
@@ -121,7 +128,19 @@ function speakTask(task: Task) {
   );
 }
 
-function TaskBody({ task, colors }: { task: Task; colors: ReturnType<typeof useColors> }) {
+function TaskBody({
+  task,
+  colors,
+  onStart,
+  onPause,
+  onComplete,
+}: {
+  task: Task;
+  colors: ReturnType<typeof useColors>;
+  onStart: () => void;
+  onPause: () => void;
+  onComplete: () => void;
+}) {
   return (
     <>
       <View style={styles.taskHeader}>
@@ -166,11 +185,11 @@ function TaskBody({ task, colors }: { task: Task; colors: ReturnType<typeof useC
       <View style={styles.actionsRow}>
         {task.status === "in_progress" ? (
           <>
-            <PrimaryButton label="Complete" onPress={() => {}} variant="primary" fullWidth={false} />
-            <PrimaryButton label="Pause" onPress={() => {}} variant="secondary" fullWidth={false} />
+            <PrimaryButton label="Complete" onPress={onComplete} variant="primary" fullWidth={false} />
+            <PrimaryButton label="Pause" onPress={onPause} variant="secondary" fullWidth={false} />
           </>
         ) : (
-          <PrimaryButton label="Start task" onPress={() => {}} variant="secondary" fullWidth={false} />
+          <PrimaryButton label="Start task" onPress={onStart} variant="secondary" fullWidth={false} />
         )}
       </View>
     </>
@@ -180,49 +199,52 @@ function TaskBody({ task, colors }: { task: Task; colors: ReturnType<typeof useC
 export function TodayScreen() {
   const colors = useColors();
   const checkedCount = useChecklistStore((s) => s.checkedIds.size);
-  const setConnectivityStatus = useConnectivityStore((s) => s.setStatus);
-  const markSynced = useConnectivityStore((s) => s.markSynced);
   const devNetworkCut = useConnectivityStore((s) => s.devNetworkCut);
-  const setSession = useAuthStore((s) => s.setSession);
-  const [liveTasks, setLiveTasks] = useState<Task[] | null>(null);
+  const token = useAuthStore((s) => s.token);
+  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [isLive, setIsLive] = useState(false);
 
+  // Session bootstrap and connectivity status/queued-count are owned by the root
+  // layout's useSyncEngine() now (CLAUDE.md §3.1) — this effect only reacts to a token
+  // becoming available to fetch this operator's real tasks, falling back to demo data
+  // otherwise rather than showing an empty/broken screen.
   useEffect(() => {
-    if (devNetworkCut) {
-      // Demo panel forced offline (§3.1: "a demo 'Cut network' toggle") — never touch
-      // the network, and keep whatever was last synced rather than clearing it, same
-      // as real airplane-mode behaviour.
-      setConnectivityStatus("offline");
-      return;
-    }
-
+    if (devNetworkCut || !token) return;
     let cancelled = false;
-    setConnectivityStatus("syncing");
-
     (async () => {
       try {
-        const { token, operatorId } = await ensureDemoSession();
         const apiTasks = await fetchTasksToday(token);
         if (cancelled) return;
-        setSession(token, operatorId);
-        setLiveTasks(apiTasks.map(mapApiTask));
-        setConnectivityStatus("online");
-        markSynced();
+        setTasks(apiTasks.map(mapApiTask));
+        setIsLive(true);
       } catch {
-        // Real backend not reachable (e.g. not running locally) — fall back to demo
-        // data rather than showing an empty/broken screen. This is the same
-        // "keeps working without a connection" principle as the safety engine,
-        // just applied to a plain data fetch instead of on-device rules.
-        if (!cancelled) setConnectivityStatus("offline");
+        // Backend reachable enough for a token but not for this call — keep whatever
+        // was already showing (demo data or the last successful live fetch).
       }
     })();
-
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devNetworkCut]);
+  }, [token, devNetworkCut]);
 
-  const tasks = liveTasks ?? mockTasks;
+  // Optimistic local update + a real outbox write (CLAUDE.md §3.1 outbox pattern) —
+  // this succeeds instantly offline; useSyncEngine drains it to /sync/push whenever
+  // there's a connection, and the server's conflict rule (§3.1) reconciles `version`.
+  async function changeTaskStatus(task: Task, status: TaskStatus) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status, version: t.version + 1 } : t)));
+    try {
+      await appendToOutbox("task_status_update", {
+        task_id: task.id,
+        status,
+        base_version: task.version,
+      });
+    } catch {
+      // lib/db not available on this platform/build — the optimistic UI update above
+      // still stands; there's just nothing queued to sync yet.
+    }
+  }
+
   const inProgress = tasks.find((t) => t.status === "in_progress");
   const upcoming = tasks.filter((t) => t.status !== "in_progress");
   const doneCount = tasks.filter((t) => t.status === "done").length;
@@ -273,7 +295,7 @@ export function TodayScreen() {
               <View style={styles.progressText}>
                 <Text style={[type.h2, { color: colors.textPrimary }]}>OP1001 · EXC001</Text>
                 <Text style={[type.caption, { color: colors.textMuted }]}>
-                  {tasks.length} tasks scheduled today · {liveTasks ? "live from backend" : "demo data"} — reorder anytime
+                  {tasks.length} tasks scheduled today · {isLive ? "live from backend" : "demo data"} — reorder anytime
                 </Text>
               </View>
             </Card>
@@ -300,7 +322,13 @@ export function TodayScreen() {
             <Animated.View entering={FadeInDown.delay(140).duration(400)}>
               <GlassCard glowColor={colors.infoGlow} style={styles.heroTask}>
                 <Text style={[type.label, { color: colors.info }]}>IN PROGRESS</Text>
-                <TaskBody task={inProgress} colors={colors} />
+                <TaskBody
+                  task={inProgress}
+                  colors={colors}
+                  onStart={() => changeTaskStatus(inProgress, "in_progress")}
+                  onPause={() => changeTaskStatus(inProgress, "pending")}
+                  onComplete={() => changeTaskStatus(inProgress, "done")}
+                />
               </GlassCard>
             </Animated.View>
           ) : null}
@@ -310,7 +338,13 @@ export function TodayScreen() {
             {upcoming.map((task, i) => (
               <Animated.View key={task.id} entering={FadeInDown.delay(200 + i * 70).duration(400)}>
                 <Card accentColor={colors[task.risk]}>
-                  <TaskBody task={task} colors={colors} />
+                  <TaskBody
+                    task={task}
+                    colors={colors}
+                    onStart={() => changeTaskStatus(task, "in_progress")}
+                    onPause={() => changeTaskStatus(task, "pending")}
+                    onComplete={() => changeTaskStatus(task, "done")}
+                  />
                 </Card>
               </Animated.View>
             ))}

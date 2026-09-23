@@ -8,9 +8,19 @@ from __future__ import annotations
 import datetime as dt
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Alert, IdleTag, Incident, Task
+from app.db.session import engine
+from app.models import Alert, IdleTag, Incident, Task, TelemetryMinute
+
+
+def _parse_iso(ts: str) -> dt.datetime:
+    """`datetime.fromisoformat` only accepts a trailing 'Z' from Python 3.11 — this venv
+    runs 3.10, and every real device client (JS `Date.toISOString()`) always emits one,
+    so this normalizes it rather than 500ing on every real sync payload."""
+    return dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
 
 
 async def apply_task_status_update(session: AsyncSession, payload: dict) -> None:
@@ -42,8 +52,8 @@ async def apply_idle_tag(session: AsyncSession, payload: dict) -> None:
             window_id=payload["window_id"],
             machine_id=payload["machine_id"],
             operator_id=payload["operator_id"],
-            ts_start=dt.datetime.fromisoformat(payload["ts_start"]),
-            ts_end=dt.datetime.fromisoformat(payload["ts_end"]),
+            ts_start=_parse_iso(payload["ts_start"]),
+            ts_end=_parse_iso(payload["ts_end"]),
             duration_min=payload["duration_min"],
             reason=payload["reason"],
         )
@@ -58,7 +68,7 @@ async def apply_incident_confirm(session: AsyncSession, payload: dict) -> None:
     if incident is None:
         incident = Incident(
             id=payload["incident_id"],
-            ts=dt.datetime.fromisoformat(payload["ts"]),
+            ts=_parse_iso(payload["ts"]),
             machine_id=payload["machine_id"],
             operator_id=payload["operator_id"],
             type=payload.get("type", "unknown"),
@@ -76,7 +86,7 @@ async def apply_incident_confirm(session: AsyncSession, payload: dict) -> None:
 async def apply_alert(session: AsyncSession, payload: dict) -> None:
     session.add(
         Alert(
-            ts=dt.datetime.fromisoformat(payload["ts"]),
+            ts=_parse_iso(payload["ts"]),
             machine_id=payload["machine_id"],
             operator_id=payload["operator_id"],
             type=payload["type"],
@@ -86,11 +96,42 @@ async def apply_alert(session: AsyncSession, payload: dict) -> None:
     )
 
 
+async def apply_telemetry_minute(session: AsyncSession, payload: dict) -> None:
+    """The device's own 1-min telemetry aggregate (CLAUDE.md §3.1: mobile's lib/mqtt
+    subscribes independently and uploads only 1-min summaries, never raw 1Hz frames),
+    arriving through the outbox rather than straight off the broker. Mirrors
+    app/services/mqtt_ingest.py's upsert exactly, so it lands in the same table whether
+    the backend saw it directly from MQTT or via a device that was offline when the
+    direct ingest worker would otherwise have caught it."""
+    row = {
+        "ts": _parse_iso(payload["ts"]),
+        "machine_id": payload["machine_id"],
+        "operator_id": payload["operator_id"],
+        "site_id": payload.get("site_id", "SITE01"),
+        "engine_on": bool(payload.get("engine_on", True)),
+        "state": payload.get("state", "work"),
+        "seatbelt": payload.get("seatbelt", "Fastened"),
+        "swing_rate_dps": float(payload.get("swing_rate_dps", 0)),
+        "travel_kmh": float(payload.get("travel_kmh", 0)),
+        "reverse": bool(payload.get("reverse", False)),
+        "fuel_rate_lph": float(payload.get("fuel_rate_lph", 0)),
+        "nearest_person_m": payload.get("nearest_person_m"),
+        "zone": payload.get("zone"),
+    }
+    dialect = engine.dialect.name
+    insert_fn = pg_insert if dialect == "postgresql" else sqlite_insert
+    stmt = insert_fn(TelemetryMinute).values(**row)
+    update_cols = {c: getattr(stmt.excluded, c) for c in row if c not in ("ts", "machine_id")}
+    stmt = stmt.on_conflict_do_update(index_elements=["ts", "machine_id"], set_=update_cols)
+    await session.execute(stmt)
+
+
 HANDLERS = {
     "task_status_update": apply_task_status_update,
     "idle_tag": apply_idle_tag,
     "incident_confirm": apply_incident_confirm,
     "alert": apply_alert,
+    "telemetry_minute": apply_telemetry_minute,
 }
 
 

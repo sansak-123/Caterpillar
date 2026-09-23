@@ -5,6 +5,7 @@ import json
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_current_user
@@ -27,27 +28,38 @@ async def push(
 ) -> SyncPushResponse:
     """Idempotent by event_id: an event already present in sync_events is acked again
     but its handler is not re-run, so resending a batch (e.g. after a dropped response
-    on a flaky connection) never double-applies a side effect."""
+    on a flaky connection) never double-applies a side effect.
+
+    Each event's check-then-insert runs inside its own SAVEPOINT (`begin_nested`):
+    two overlapping requests can both pass the "not already seen" check for the same
+    event_id before either commits (a real client-side double-drain bug this caught —
+    see mobile's useSyncEngine), which raced to a raw IntegrityError before. Now the
+    loser's SAVEPOINT rolls back just that one event — not the rest of the batch — and
+    it's acked anyway, since the winner already persisted the identical event."""
     acked: list[str] = []
     to_broadcast: list[dict] = []
     for event in body.events:
-        already_seen = await session.scalar(
-            select(SyncEvent).where(SyncEvent.event_id == event.event_id)
-        )
-        if already_seen is None:
-            session.add(
-                SyncEvent(
-                    event_id=event.event_id,
-                    device_id=event.device_id,
-                    type=event.type,
-                    payload_json=json.dumps(event.payload),
-                    attempt=event.attempt,
-                    created_at=event.created_at,
+        try:
+            async with session.begin_nested():
+                already_seen = await session.scalar(
+                    select(SyncEvent).where(SyncEvent.event_id == event.event_id)
                 )
-            )
-            await apply_event(session, event.type, event.payload)
-            if event.type in LIVE_ALERT_EVENT_TYPES:
-                to_broadcast.append({"type": event.type, "payload": event.payload})
+                if already_seen is None:
+                    session.add(
+                        SyncEvent(
+                            event_id=event.event_id,
+                            device_id=event.device_id,
+                            type=event.type,
+                            payload_json=json.dumps(event.payload),
+                            attempt=event.attempt,
+                            created_at=event.created_at,
+                        )
+                    )
+                    await apply_event(session, event.type, event.payload)
+                    if event.type in LIVE_ALERT_EVENT_TYPES:
+                        to_broadcast.append({"type": event.type, "payload": event.payload})
+        except IntegrityError:
+            pass  # a concurrent request already persisted this exact event_id
         acked.append(event.event_id)
 
     await session.commit()

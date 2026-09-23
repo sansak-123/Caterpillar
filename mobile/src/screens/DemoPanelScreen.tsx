@@ -1,20 +1,22 @@
 import * as Haptics from "expo-haptics";
-import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { router } from "expo-router";
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
+import { PrimaryButton } from "../components/PrimaryButton";
 import { ScreenBackground } from "../components/ScreenBackground";
 import { useConnectivityStore } from "../store/connectivity";
+import { DEMO_BEAT_LABEL, DEMO_BEAT_ORDER, useDemoStore } from "../store/demo";
 import { useColors } from "../theme/useColors";
-import { spacing, type } from "../theme/tokens";
+import { radius, spacing, touchTarget, type } from "../theme/tokens";
 
 // CLAUDE.md section 3.1: "a persistent connectivity pill ... and a demo 'Cut network'
 // toggle in a dev-only screen." This is that screen — not part of the operator-facing
 // tab bar. The narrative beats below mirror CLAUDE.md section 2's demo arc; only the
-// network-cut mechanic is actually wired end-to-end today (real fetch vs. real fallback
-// — see TodayScreen), the rest describes what a full run-through demonstrates once
-// Phase 6 (supervisor view) and Phase 7 (Unity) exist.
+// network-cut mechanic, the jump-to-beat buttons, and the Supervisor View link are
+// actually wired end-to-end today — the rest still needs Phase 7 (Unity) to exist.
 const NARRATIVE_BEATS = [
   "10:00 seatbelt off + idle spike",
   "Idle Intent prompt shown (protective framing)",
@@ -32,6 +34,8 @@ export function DemoPanelScreen() {
   const devNetworkCut = useConnectivityStore((s) => s.devNetworkCut);
   const toggleDevNetworkCut = useConnectivityStore((s) => s.toggleDevNetworkCut);
   const status = useConnectivityStore((s) => s.status);
+  const activeBeat = useDemoStore((s) => s.beat);
+  const setBeat = useDemoStore((s) => s.setBeat);
 
   return (
     <ScreenBackground>
@@ -64,6 +68,45 @@ export function DemoPanelScreen() {
               <Badge label={status} tone={status === "online" ? "safe" : status === "offline" ? "danger" : "caution"} />
             </View>
           </Card>
+
+          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Jump to beat (Safety tab)</Text>
+          <Text style={[type.body, { color: colors.textMuted }]}>
+            Drives the same live proximity math the Safety tab shows — switch tabs after tapping a beat to see it
+            react in real time (real lib/safety zones, seatbelt alert level, and near-miss trigger, not a canned
+            screenshot).
+          </Text>
+          <View style={styles.beatButtons}>
+            {DEMO_BEAT_ORDER.map((b) => (
+              <Pressable
+                key={b}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setBeat(b);
+                }}
+                style={[
+                  styles.beatButton,
+                  {
+                    backgroundColor: b === activeBeat ? colors.accent : colors.surfaceRaised,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[type.bodyStrong, { color: b === activeBeat ? colors.accentOn : colors.textPrimary }]}
+                  numberOfLines={2}
+                >
+                  {DEMO_BEAT_LABEL[b]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <PrimaryButton
+            label="Open Supervisor View"
+            onPress={() => router.push("/supervisor")}
+            variant="secondary"
+            fullWidth={false}
+          />
 
           <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Narrative script</Text>
           <View style={styles.beatsList}>
@@ -99,5 +142,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
     alignItems: "flex-start",
+  },
+  beatButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  beatButton: {
+    minWidth: "47%",
+    minHeight: touchTarget,
+    flexGrow: 1,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
 });
