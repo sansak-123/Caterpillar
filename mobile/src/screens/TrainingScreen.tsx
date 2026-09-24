@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as Haptics from "expo-haptics";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -16,6 +17,9 @@ import {
   type Lesson,
   type LessonCategory,
 } from "../content/trainingLibrary";
+import { postBookingRequest, type BookingResponse } from "../lib/api/client";
+import { useAuthStore } from "../store/auth";
+import { useLanguageStore } from "../store/language";
 import { useColors } from "../theme/useColors";
 import { radius, spacing, type } from "../theme/tokens";
 
@@ -63,8 +67,31 @@ const scenarios: Scenario[] = [
 
 export function TrainingScreen() {
   const colors = useColors();
+  const token = useAuthStore((s) => s.token);
+  const language = useLanguageStore((s) => s.language);
   const firstWeekPath = beginnerPath();
   const [showRefreshers, setShowRefreshers] = useState(false);
+  const [booking, setBooking] = useState<
+    { status: "idle" } | { status: "loading" } | { status: "error"; message: string } | { status: "done"; result: BookingResponse }
+  >({ status: "idle" });
+
+  async function requestBooking() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!token) {
+      setBooking({ status: "error", message: "Sign-in required — try again once the app has connected." });
+      return;
+    }
+    setBooking({ status: "loading" });
+    try {
+      const result = await postBookingRequest(token, {
+        message: "book me the next available instructor slot",
+        language,
+      });
+      setBooking({ status: "done", result });
+    } catch {
+      setBooking({ status: "error", message: "Couldn't reach the booking service — try again shortly." });
+    }
+  }
 
   return (
     <ScreenBackground>
@@ -168,9 +195,41 @@ export function TrainingScreen() {
 
           <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Book an instructor</Text>
           <Card>
-            <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>Next available slot</Text>
-            <Text style={[type.caption, { color: colors.textMuted }]}>Fri 9:00 AM · site supervisor approval not required</Text>
-            <PrimaryButton label="Request booking" onPress={() => {}} variant="secondary" fullWidth={false} />
+            {booking.status === "done" ? (
+              <>
+                <View style={styles.rowBetween}>
+                  <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>Booking requested</Text>
+                  <Badge label={booking.result.status} tone="info" />
+                </View>
+                <Text style={[type.body, { color: colors.textMuted }]}>{booking.result.reply}</Text>
+                <Text style={[type.caption, { color: colors.textMuted }]}>
+                  {new Date(booking.result.slot_start).toLocaleString()} –{" "}
+                  {new Date(booking.result.slot_end).toLocaleTimeString()}
+                </Text>
+                <PrimaryButton
+                  label="Request another slot"
+                  onPress={requestBooking}
+                  variant="secondary"
+                  fullWidth={false}
+                />
+              </>
+            ) : (
+              <>
+                <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>Request a slot</Text>
+                <Text style={[type.caption, { color: colors.textMuted }]}>
+                  Books the next available instructor slot — needs a connection, same as the assistant&apos;s booking.
+                </Text>
+                {booking.status === "error" ? (
+                  <Text style={[type.caption, { color: colors.danger }]}>{booking.message}</Text>
+                ) : null}
+                <PrimaryButton
+                  label={booking.status === "loading" ? "Requesting…" : "Request booking"}
+                  onPress={requestBooking}
+                  variant="secondary"
+                  fullWidth={false}
+                />
+              </>
+            )}
           </Card>
         </ScrollView>
       </SafeAreaView>
