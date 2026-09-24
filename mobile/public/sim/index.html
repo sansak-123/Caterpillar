@@ -14,13 +14,13 @@
 <body>
   <canvas id="unity-canvas" tabindex="-1"></canvas>
   <div id="loading">Loading simulation… <span id="pct">0</span>%</div>
-  <script src="Build/build.loader.js"></script>
+  <script src="Build/sim.loader.js"></script>
   <script>
     var canvas = document.getElementById("unity-canvas");
     createUnityInstance(canvas, {
-      dataUrl: "Build/build.data",
-      frameworkUrl: "Build/build.framework.js",
-      codeUrl: "Build/build.wasm",
+      dataUrl: "Build/sim.data",
+      frameworkUrl: "Build/sim.framework.js",
+      codeUrl: "Build/sim.wasm",
       streamingAssetsUrl: "StreamingAssets",
       companyName: "DefaultCompany",
       productName: "SiteSafety",
@@ -30,7 +30,9 @@
     }).then(function (instance) {
       window.unityInstance = instance;
       document.getElementById("loading").remove();
-      window.parent.postMessage({ source: "unity-sim", type: "ready", data: {} }, "*");
+      var ready = { source: "unity-sim", type: "ready", data: {} };
+      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(ready));
+      else window.parent.postMessage(ready, "*");
     }).catch(function (e) {
       document.getElementById("loading").textContent = "Simulation failed to load: " + e;
     });

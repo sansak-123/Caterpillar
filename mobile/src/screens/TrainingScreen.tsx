@@ -44,7 +44,8 @@ const scenarios: Scenario[] = [
   {
     id: "NearMissReplay",
     title: "Near-Miss Replay",
-    description: "Relive your rear-blind-spot near-miss from this morning, safely, in the simulator.",
+    description:
+      "Drive near workers with live red/amber zones — near-misses are captured automatically, then relived in slow motion so you can try it again.",
     tag: "New from today",
   },
   {
@@ -58,6 +59,13 @@ const scenarios: Scenario[] = [
     title: "Loading in Rain",
     description: "Reduced visibility and traction — condition-adaptive proximity zones active.",
     tag: "Assigned",
+  },
+  {
+    id: "WelfareCheck",
+    title: "Operator Check-in",
+    description:
+      "A soft, voice-answerable \"Are you OK?\" when the controls go untouched too long. No answer escalates to a welfare check — never a discipline flag.",
+    tag: "USP-6",
   },
 ];
 
