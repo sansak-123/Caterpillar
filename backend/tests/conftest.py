@@ -9,9 +9,22 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401 register all tables on Base.metadata
+from app.core.config import Settings
 from app.db.session import Base, get_db
 from app.main import app
 from app.models import Machine, Operator, Site, Task
+
+
+@pytest.fixture
+def no_openrouter_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Some assistant tests specifically exercise the no-key grounded/heuristic fallback
+    path — that must hold regardless of whatever real OPENROUTER_API_KEY a developer has
+    configured in their own backend/.env for actually running the app locally. An init
+    kwarg to Settings() takes precedence over the .env file (pydantic-settings), so this
+    forces the condition deterministically instead of relying on ambient dev config."""
+    monkeypatch.setattr(
+        "app.assistant.service.get_settings", lambda: Settings(openrouter_api_key="")
+    )
 
 
 @pytest.fixture

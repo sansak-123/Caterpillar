@@ -15,9 +15,12 @@ the app it's answering for.
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import json
+import logging
 import uuid
+from typing import Awaitable, Callable, TypeVar
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -38,6 +41,29 @@ from app.schemas.assistant import (
     IncidentReportResponse,
 )
 from app.services.ml_service import get_task_time_model
+
+logger = logging.getLogger(__name__)
+
+_T = TypeVar("_T")
+
+
+async def _with_retry(call: Callable[[], Awaitable[_T]], *, label: str, attempts: int = 2) -> _T:
+    """Free-tier OpenRouter models intermittently rate-limit or cold-start (a 429 or a
+    brief timeout, not a real outage) — see calibration.md-style note: this was caught
+    live, a real user message got the generic degraded fallback even though the key and
+    model were both genuinely working seconds before and after. One quick retry absorbs
+    that without masking an actually-broken key (every attempt's failure is logged)."""
+    last_exc: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return await call()
+        except Exception as exc:  # noqa: BLE001 — logged below, re-raised to the caller's own fallback
+            last_exc = exc
+            logger.warning("[assistant] %s failed (attempt %d/%d): %r", label, attempt, attempts, exc)
+            if attempt < attempts:
+                await asyncio.sleep(0.5)
+    assert last_exc is not None
+    raise last_exc
 
 _SAFETY_KB: tuple[tuple[str, str], ...] = (
     (
@@ -109,22 +135,25 @@ async def _maybe_llm_phrase(language: str, grounded_text: str) -> tuple[str, str
         return grounded_text, "grounded"
     try:
         client = get_openrouter_client()
-        response = await client.chat.completions.create(
-            model=settings.assistant_fast_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Rephrase the following operator-facing message in "
-                        f"{language_name(language)}, keeping it to 1-2 short sentences a "
-                        "driver can glance at or hear read aloud. Keep every number and "
-                        "fact exactly as given — do not invent or drop any."
-                    ),
-                },
-                {"role": "user", "content": grounded_text},
-            ],
-            max_tokens=200,
-            temperature=0.3,
+        response = await _with_retry(
+            lambda: client.chat.completions.create(
+                model=settings.assistant_fast_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Rephrase the following operator-facing message in "
+                            f"{language_name(language)}, keeping it to 1-2 short sentences a "
+                            "driver can glance at or hear read aloud. Keep every number and "
+                            "fact exactly as given — do not invent or drop any."
+                        ),
+                    },
+                    {"role": "user", "content": grounded_text},
+                ],
+                max_tokens=200,
+                temperature=0.3,
+            ),
+            label="_maybe_llm_phrase",
         )
         text = (response.choices[0].message.content or "").strip()
         return (text, "llm") if text else (grounded_text, "grounded")
@@ -291,20 +320,24 @@ async def _safety_or_general(
 
     try:
         client = get_openrouter_client()
-        response = await client.chat.completions.create(
-            model=settings.assistant_fast_model,
-            messages=[
-                {"role": "system", "content": _chat_system_prompt(language, kb_hit)},
-                {"role": "user", "content": body.message},
-            ],
-            max_tokens=220,
-            temperature=0.4,
+        response = await _with_retry(
+            lambda: client.chat.completions.create(
+                model=settings.assistant_fast_model,
+                messages=[
+                    {"role": "system", "content": _chat_system_prompt(language, kb_hit)},
+                    {"role": "user", "content": body.message},
+                ],
+                max_tokens=220,
+                temperature=0.4,
+            ),
+            label="_safety_or_general",
         )
         text = (response.choices[0].message.content or "").strip()
         if not text:
             raise ValueError("empty completion")
         return AssistantChatResponse(reply=text, intent=intent, language=language, source="llm")
-    except Exception:
+    except Exception as exc:
+        logger.warning("[assistant] _safety_or_general gave up after retries: %r", exc)
         if kb_hit:
             return AssistantChatResponse(
                 reply=kb_hit, intent=intent, language=language, source="grounded"
@@ -427,15 +460,18 @@ async def _llm_structure_incident(transcript: str, language: str) -> dict:
         'reports see a consistent language), "confidence" (0 to 1 float, your honest '
         "confidence given how much detail was actually said)."
     )
-    response = await client.chat.completions.create(
-        model=settings.assistant_strong_model,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": transcript},
-        ],
-        max_tokens=300,
-        temperature=0.1,
-        response_format={"type": "json_object"},
+    response = await _with_retry(
+        lambda: client.chat.completions.create(
+            model=settings.assistant_strong_model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": transcript},
+            ],
+            max_tokens=300,
+            temperature=0.1,
+            response_format={"type": "json_object"},
+        ),
+        label="_llm_structure_incident",
     )
     text = response.choices[0].message.content or ""
     parsed = json.loads(text)
@@ -460,7 +496,8 @@ async def handle_incident_report(
         try:
             parsed = await _llm_structure_incident(body.transcript, language)
             source = "llm"
-        except Exception:
+        except Exception as exc:
+            logger.warning("[assistant] _llm_structure_incident gave up after retries: %r", exc)
             parsed = None
     if parsed is None:
         parsed = _heuristic_structure_incident(body.transcript)
