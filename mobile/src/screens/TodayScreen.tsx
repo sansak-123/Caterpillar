@@ -13,7 +13,7 @@ import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
 import { ConnectivityPill } from "../components/ConnectivityPill";
 import { GlassCard } from "../components/GlassCard";
-import { FlaskIcon, HazardIcon, SpeakerIcon } from "../components/icons";
+import { CheckIcon, FlaskIcon, HazardIcon, SpeakerIcon } from "../components/icons";
 import { InsightCard } from "../components/InsightCard";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -21,7 +21,7 @@ import { ProgressRing } from "../components/ProgressRing";
 import { ScreenBackground } from "../components/ScreenBackground";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { PRE_START_CHECKLIST } from "../content/preStartChecklist";
-import { fetchTasksToday, type ApiTask } from "../lib/api/client";
+import { DEMO_MACHINE_ID, fetchTasksToday, type ApiTask } from "../lib/api/client";
 import { localeFor } from "../lib/assistant/voice";
 import { estimateTaskTimeOffline } from "../lib/onnx/taskTimeModel";
 import { appendToOutbox } from "../lib/sync/outbox";
@@ -261,6 +261,7 @@ export function TodayScreen() {
   const language = useLanguageStore((s) => s.language);
   const checkedCount = useChecklistStore((s) => s.checkedIds.size);
   const devNetworkCut = useConnectivityStore((s) => s.devNetworkCut);
+  const connectivityStatus = useConnectivityStore((s) => s.status);
   const token = useAuthStore((s) => s.token);
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [offlineEstimates, setOfflineEstimates] = useState<Record<string, { p50: number; p90: number }>>({});
@@ -380,20 +381,35 @@ export function TodayScreen() {
 
           <Animated.View entering={FadeInDown.delay(80).duration(400)}>
             <Card style={styles.progressCard}>
-              <ProgressRing
-                progress={tasks.length ? doneCount / tasks.length : 0}
-                size={92}
-                strokeWidth={9}
-                color={colors.accent}
-                trackColor={colors.ringTrack}
-                value={`${doneCount}/${tasks.length}`}
-                valueColor={colors.textPrimary}
-              />
-              <View style={styles.progressText}>
-                <Text style={[type.h2, { color: colors.textPrimary }]}>OP1001 · EXC001</Text>
-                <Text style={[type.caption, { color: colors.textMuted }]}>
-                  {t("today.tasksScheduled", { count: tasks.length })} — {t("today.reorderAnytime")}
-                </Text>
+              <View style={styles.progressTop}>
+                <ProgressRing
+                  progress={tasks.length ? doneCount / tasks.length : 0}
+                  size={92}
+                  strokeWidth={9}
+                  color={colors.accent}
+                  trackColor={colors.ringTrack}
+                  value={`${doneCount}/${tasks.length}`}
+                  valueColor={colors.textPrimary}
+                />
+                <View style={styles.progressText}>
+                  <Text style={[type.h2, { color: colors.textPrimary }]}>OP1001 · {DEMO_MACHINE_ID}</Text>
+                  <Text style={[type.caption, { color: colors.textMuted }]}>
+                    {t("today.tasksScheduled", { count: tasks.length })} — {t("today.reorderAnytime")}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.statusList}>
+                <StatusRow
+                  ok={checkedCount === PRE_START_CHECKLIST.length}
+                  label={`Pre-start checklist ${checkedCount}/${PRE_START_CHECKLIST.length}`}
+                  colors={colors}
+                />
+                <StatusRow ok={doneCount === tasks.length && tasks.length > 0} label={`${doneCount}/${tasks.length} tasks complete`} colors={colors} />
+                <StatusRow
+                  ok={!devNetworkCut && connectivityStatus === "online"}
+                  label={devNetworkCut ? "Offline (dev mode)" : connectivityStatus === "online" ? "Synced" : "Syncing…"}
+                  colors={colors}
+                />
               </View>
             </Card>
           </Animated.View>
@@ -460,6 +476,21 @@ export function TodayScreen() {
   );
 }
 
+function StatusRow({ ok, label, colors }: { ok: boolean; label: string; colors: ReturnType<typeof useColors> }) {
+  return (
+    <View style={styles.statusRow}>
+      <View style={[styles.statusDot, { backgroundColor: ok ? `${colors.safe}22` : `${colors.caution}22` }]}>
+        {ok ? (
+          <CheckIcon color={colors.safe} size={12} />
+        ) : (
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.caution }} />
+        )}
+      </View>
+      <Text style={[type.caption, { color: colors.textSecondary }]}>{label}</Text>
+    </View>
+  );
+}
+
 function ShiftToolButton({
   label,
   sublabel,
@@ -522,6 +553,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   progressCard: {
+    gap: spacing.md,
+  },
+  progressTop: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
@@ -529,6 +563,21 @@ const styles = StyleSheet.create({
   progressText: {
     flex: 1,
     gap: 2,
+  },
+  statusList: {
+    gap: spacing.xs,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  statusDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   heroTask: {
     marginTop: spacing.xs,
