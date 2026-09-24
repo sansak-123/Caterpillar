@@ -47,17 +47,40 @@ const DISPLAY_RADIUS = CENTER - 20;
 // near-miss trigger) is the REAL lib/safety math reacting to those inputs, exactly as
 // it would from live telemetry (USP-4: condition-adaptive envelope; Rule 1: input
 // lockout while moving).
-const CONDITIONS = { visibilityM: 2100, precipMm: 0, windKmh: 18 };
+const SIMULATION_TICK_MS = 100;
+const PHASE_DURATION_MS = 4_000;
 
-type BeatConfig = { isSwinging: boolean; seatbeltUnfastened: boolean; workerDistanceM: number };
+type BeatConfig = {
+  isSwinging: boolean;
+  seatbeltUnfastened: boolean;
+  from: { workerDistanceM: number; visibilityM: number; windKmh: number };
+  to: { workerDistanceM: number; visibilityM: number; windKmh: number };
+};
 
 const BEAT_CONFIG: Record<DemoBeat, BeatConfig> = {
-  normal: { isSwinging: false, seatbeltUnfastened: false, workerDistanceM: 25 },
-  seatbelt_idle: { isSwinging: false, seatbeltUnfastened: true, workerDistanceM: 25 },
-  approaching: { isSwinging: true, seatbeltUnfastened: false, workerDistanceM: 15 },
-  red_alert: { isSwinging: true, seatbeltUnfastened: false, workerDistanceM: 10 },
-  recovery: { isSwinging: false, seatbeltUnfastened: false, workerDistanceM: 20 },
+  normal: {
+    isSwinging: false, seatbeltUnfastened: false,
+    from: { workerDistanceM: 28, visibilityM: 3000, windKmh: 10 }, to: { workerDistanceM: 25, visibilityM: 2500, windKmh: 14 },
+  },
+  seatbelt_idle: {
+    isSwinging: false, seatbeltUnfastened: true,
+    from: { workerDistanceM: 25, visibilityM: 2500, windKmh: 14 }, to: { workerDistanceM: 23, visibilityM: 2200, windKmh: 16 },
+  },
+  approaching: {
+    isSwinging: true, seatbeltUnfastened: false,
+    from: { workerDistanceM: 23, visibilityM: 2200, windKmh: 16 }, to: { workerDistanceM: 11, visibilityM: 1900, windKmh: 20 },
+  },
+  red_alert: {
+    isSwinging: true, seatbeltUnfastened: false,
+    from: { workerDistanceM: 11, visibilityM: 1900, windKmh: 20 }, to: { workerDistanceM: 7, visibilityM: 1700, windKmh: 24 },
+  },
+  recovery: {
+    isSwinging: false, seatbeltUnfastened: false,
+    from: { workerDistanceM: 7, visibilityM: 1700, windKmh: 24 }, to: { workerDistanceM: 28, visibilityM: 2600, windKmh: 12 },
+  },
 };
+
+const interpolate = (from: number, to: number, progress: number) => from + (to - from) * progress;
 
 function polarToXY(angleDeg: number, radius: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
@@ -139,18 +162,42 @@ export function SafetyScreen() {
   const [idleTagged, setIdleTagged] = useState<IdleReason | null>(null);
   const [checkedIn, setCheckedIn] = useState(false);
   const [draft, setDraft] = useState<NearMissDraft | null>(null);
+  const [isSimulationRunning, setIsSimulationRunning] = useState(true);
+  const [phaseElapsedMs, setPhaseElapsedMs] = useState(0);
+  const phaseElapsedRef = useRef(0);
   const beat = useDemoStore((s) => s.beat);
   const nextBeat = useDemoStore((s) => s.nextBeat);
 
   const confirmVoice = useVoiceInput("en");
   const checkInVoice = useVoiceInput("en");
 
-  // --- Real lib/safety computation, not hardcoded strings ---
-  const { isSwinging, seatbeltUnfastened, workerDistanceM } = BEAT_CONFIG[beat];
+  // The simulator produces a new telemetry reading ten times per second. The zone
+  // calculation below is deliberately run from those moving values on every render.
+  useEffect(() => {
+    if (!isSimulationRunning) return;
+    const timer = setInterval(() => {
+      phaseElapsedRef.current += SIMULATION_TICK_MS;
+      if (phaseElapsedRef.current >= PHASE_DURATION_MS) {
+        phaseElapsedRef.current = 0;
+        nextBeat();
+      }
+      setPhaseElapsedMs(phaseElapsedRef.current);
+    }, SIMULATION_TICK_MS);
+    return () => clearInterval(timer);
+  }, [isSimulationRunning, nextBeat]);
+
+  // --- Real lib/safety computation, driven by the running telemetry loop ---
+  const phaseProgress = Math.min(phaseElapsedMs / PHASE_DURATION_MS, 1);
+  const phase = BEAT_CONFIG[beat];
+  const { isSwinging, seatbeltUnfastened } = phase;
+  const workerDistanceM = interpolate(phase.from.workerDistanceM, phase.to.workerDistanceM, phaseProgress);
+  const visibilityM = interpolate(phase.from.visibilityM, phase.to.visibilityM, phaseProgress);
+  const windKmh = interpolate(phase.from.windKmh, phase.to.windKmh, phaseProgress);
+  const precipMm = 0;
   const travelKmh = 0; // swinging in place, not traveling
   const swingRateDps = isSwinging ? 8 : 0;
   const belt = seatbeltAlert(true, travelKmh, swingRateDps, seatbeltUnfastened, 12);
-  const zones = proximityZones("excavator", CONDITIONS.visibilityM, CONDITIONS.precipMm, CONDITIONS.windKmh, isSwinging, false, true);
+  const zones = proximityZones("excavator", visibilityM, precipMm, windKmh, isSwinging, false, true);
   const workerZone = zoneForDistance(workerDistanceM, zones);
   const liveMiss = nearMissTrigger(workerZone, isSwinging, false, seatbeltUnfastened, travelKmh);
   const tapAllowed = acceptsConfirmation("tap", travelKmh, swingRateDps);
@@ -282,8 +329,24 @@ export function SafetyScreen() {
           <Text style={[type.display, { color: colors.textPrimary }]}>Live proximity</Text>
 
           <Pressable
+            testID="safety-simulation-toggle"
             onPress={() => {
               Haptics.selectionAsync();
+              setIsSimulationRunning((running) => !running);
+            }}
+            style={[styles.demoToggle, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}
+          >
+            <Text style={[type.caption, { color: isSimulationRunning ? colors.safe : colors.textMuted }]}>
+              {isSimulationRunning ? "LIVE — running (tap to pause)" : "PAUSED — tap to run"}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            testID="safety-demo-beat-advance"
+            onPress={() => {
+              Haptics.selectionAsync();
+              phaseElapsedRef.current = 0;
+              setPhaseElapsedMs(0);
               nextBeat();
             }}
             style={[styles.demoToggle, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}
@@ -305,9 +368,9 @@ export function SafetyScreen() {
                 {workerZone === "red" ? "Worker in blind spot while swinging" : "Worker in rear sector"}
               </Text>
               <Text style={[type.body, { color: colors.textMuted }]}>
-                Zone widened for visibility ({(CONDITIONS.visibilityM / 1000).toFixed(1)} km) and wind (
-                {CONDITIONS.windKmh} km/h) — red {zones.redM.toFixed(1)} m, amber {zones.amberM.toFixed(1)} m. Worker
-                at {workerDistanceM} m.
+                Zone widened for visibility ({(visibilityM / 1000).toFixed(1)} km) and wind (
+                {windKmh.toFixed(1)} km/h) — red {zones.redM.toFixed(1)} m, amber {zones.amberM.toFixed(1)} m. Worker
+                at {workerDistanceM.toFixed(1)} m.
               </Text>
 
               <RadarView
@@ -317,6 +380,10 @@ export function SafetyScreen() {
                 workerDistanceM={workerDistanceM}
                 workerZone={workerZone}
               />
+
+              <Text style={[type.caption, { color: colors.textMuted, textAlign: "center" }]}>
+                Calculation tick {phaseElapsedMs / 1000}s / {PHASE_DURATION_MS / 1000}s · {workerZone.toUpperCase()} at {workerDistanceM.toFixed(1)} m
+              </Text>
 
               <View style={styles.legendRow}>
                 <Badge label="Green" tone="safe" />
@@ -361,12 +428,14 @@ export function SafetyScreen() {
                 {tapAllowed ? (
                   <View style={styles.actionsRow}>
                     <PrimaryButton
+                      testID="near-miss-confirm"
                       label="Confirm"
                       onPress={() => confirmDraft(draft)}
                       variant="primary"
                       fullWidth={false}
                     />
                     <PrimaryButton
+                      testID="near-miss-dismiss"
                       label="Dismiss"
                       onPress={() => setDraft((d) => (d ? { ...d, status: "dismissed" } : d))}
                       variant="secondary"
@@ -486,8 +555,8 @@ export function SafetyScreen() {
               <Text style={[type.h2, { color: colors.textPrimary }]}>Working conditions</Text>
               <View style={styles.conditionsGrid}>
                 <Condition label="Heat index" value="34°C" colors={colors} />
-                <Condition label="Wind" value={`${CONDITIONS.windKmh} km/h`} colors={colors} />
-                <Condition label="Visibility" value={`${(CONDITIONS.visibilityM / 1000).toFixed(1)} km`} colors={colors} />
+                <Condition label="Wind" value={`${windKmh.toFixed(1)} km/h`} colors={colors} />
+                <Condition label="Visibility" value={`${(visibilityM / 1000).toFixed(1)} km`} colors={colors} />
                 <Condition label="On shift" value="3h 40m" colors={colors} />
               </View>
             </Card>
@@ -551,6 +620,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     alignSelf: "flex-start",
+  },
+  simulationControls: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
   },
   alertCard: {
     gap: spacing.sm,
