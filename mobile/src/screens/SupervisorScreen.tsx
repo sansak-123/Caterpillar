@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
-import { ScreenBackground } from "../components/ScreenBackground";
+import { HazardIcon, PulseIcon, RadioIcon } from "../components/icons";
+import { CardHeader, Columns, Grid, IconTile, Page } from "../components/Page";
 import {
   ensureDemoSupervisorSession,
   fetchIncidents,
@@ -16,7 +16,7 @@ import {
   type SupervisorOverview,
 } from "../lib/api/client";
 import { useColors } from "../theme/useColors";
-import { spacing, type } from "../theme/tokens";
+import { radius, spacing, type } from "../theme/tokens";
 
 /**
  * Phase 6 slice — CLAUDE.md §6 "Supervisor" and §2.1 Rule 2. Real backend data
@@ -58,87 +58,67 @@ export function SupervisorScreen() {
   }, []);
 
   return (
-    <ScreenBackground>
-      <SafeAreaView style={styles.screen} edges={["top"]}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={[type.label, { color: colors.textMuted }]}>SUPERVISOR</Text>
-          <Text style={[type.display, { color: colors.textPrimary }]}>Fleet overview</Text>
-          <Text style={[type.body, { color: colors.textMuted }]}>
-            Site-level patterns only — an individual operator&apos;s own record stays private unless
-            they confirmed it themself (§2.1 Rule 2).
-          </Text>
+    <Page
+      eyebrow="Supervisor · Site overview"
+      title="Fleet overview"
+      subtitle="Site-level patterns only — an individual operator's own record stays private unless they confirmed it themself (§2.1 Rule 2)."
+      status={error ? { label: "Backend offline", tone: "danger" } : overview ? { label: "Live data", tone: "safe" } : { label: "Loading…", tone: "neutral" }}
+      showBack
+    >
+      {error ? (
+        <View style={[styles.banner, { backgroundColor: colors.dangerSoft, borderColor: `${colors.danger}55` }]}>
+          <HazardIcon color={colors.danger} size={18} />
+          <Text style={[type.caption, { color: colors.textPrimary, flex: 1 }]}>{error}</Text>
+        </View>
+      ) : null}
 
-          {error ? (
-            <Card accentColor={colors.danger}>
-              <Text style={[type.body, { color: colors.textMuted }]}>{error}</Text>
-            </Card>
-          ) : null}
+      {overview ? (
+        <Animated.View entering={FadeInDown.duration(350)}>
+          <Grid cols={3} phoneCols={1}>
+            <Stat
+              icon={<PulseIcon color={colors.textPrimary} size={16} />}
+              label="Tasks today"
+              value={String(Object.values(overview.today_task_status).reduce((a, b) => a + b, 0))}
+              colors={colors}
+            />
+            <Stat
+              icon={<HazardIcon color={overview.tasks_with_conflict > 0 ? colors.caution : colors.safe} size={16} />}
+              label="Tasks flagged with a sync conflict"
+              value={String(overview.tasks_with_conflict)}
+              colors={colors}
+              tone={overview.tasks_with_conflict > 0 ? "caution" : "safe"}
+            />
+            <Stat
+              icon={<RadioIcon color={overview.unconfirmed_near_misses > 0 ? colors.caution : colors.safe} size={16} />}
+              label="Unconfirmed near-misses fleet-wide"
+              value={String(overview.unconfirmed_near_misses)}
+              colors={colors}
+              tone={overview.unconfirmed_near_misses > 0 ? "caution" : "safe"}
+            />
+          </Grid>
+        </Animated.View>
+      ) : null}
 
-          {overview ? (
-            <Animated.View entering={FadeInDown.duration(350)}>
-              <Card>
-                <Text style={[type.h2, { color: colors.textPrimary }]}>Today&apos;s tasks</Text>
-                <View style={styles.chipRow}>
-                  {Object.entries(overview.today_task_status).map(([status, count]) => (
-                    <Badge key={status} label={`${status}: ${count}`} tone="neutral" />
-                  ))}
-                  {Object.keys(overview.today_task_status).length === 0 ? (
-                    <Text style={[type.body, { color: colors.textMuted }]}>No tasks scheduled today.</Text>
-                  ) : null}
-                </View>
-                <View style={styles.rowBetween}>
-                  <Text style={[type.body, { color: colors.textMuted }]}>Tasks flagged with a sync conflict</Text>
-                  <Badge
-                    label={String(overview.tasks_with_conflict)}
-                    tone={overview.tasks_with_conflict > 0 ? "caution" : "safe"}
-                  />
-                </View>
-                <View style={styles.rowBetween}>
-                  <Text style={[type.body, { color: colors.textMuted }]}>Unconfirmed near-misses fleet-wide</Text>
-                  <Badge
-                    label={String(overview.unconfirmed_near_misses)}
-                    tone={overview.unconfirmed_near_misses > 0 ? "caution" : "safe"}
-                  />
-                </View>
-              </Card>
-            </Animated.View>
-          ) : null}
-
-          {hotspots ? (
-            <Animated.View entering={FadeInDown.delay(80).duration(350)}>
-              <Card accentColor={colors.info}>
-                <Text style={[type.h2, { color: colors.textPrimary }]}>Near-miss hotspots</Text>
-                <Text style={[type.body, { color: colors.textMuted }]}>
-                  {hotspots.total_near_misses} total · worst hour {hotspots.worst_hour}:00 · worst sector{" "}
-                  {hotspots.worst_sector} · worst condition {hotspots.worst_condition}
-                </Text>
-                <Text style={[type.bodyStrong, { color: colors.textPrimary, marginTop: spacing.xs }]}>By machine</Text>
-                <View style={styles.chipRow}>
-                  {Object.entries(hotspots.by_machine)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 6)
-                    .map(([machine, count]) => (
-                      <Badge key={machine} label={`${machine}: ${count}`} tone="neutral" />
-                    ))}
-                </View>
-              </Card>
-            </Animated.View>
-          ) : null}
-
-          {incidents ? (
+      <Columns
+        sideWidth={380}
+        main={
+          incidents ? (
             <Animated.View entering={FadeInDown.delay(140).duration(350)}>
               <Card>
-                <Text style={[type.h2, { color: colors.textPrimary }]}>Recent near-misses / incidents</Text>
+                <CardHeader eyebrow="Activity" title="Recent near-misses / incidents" />
                 {incidents.length === 0 ? (
-                  <Text style={[type.body, { color: colors.textMuted }]}>Nothing on record.</Text>
+                  <Text style={[type.caption, { color: colors.textMuted }]}>Nothing on record.</Text>
                 ) : (
                   incidents.slice(0, 8).map((incident) => (
-                    <View key={incident.id} style={styles.incidentRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>
+                    <View key={incident.id} style={[styles.incidentRow, { borderTopColor: colors.border }]}>
+                      <IconTile bg={incident.confirmed ? colors.safeSoft : colors.cautionSoft} size={30}>
+                        <HazardIcon color={incident.confirmed ? colors.safe : colors.caution} size={14} />
+                      </IconTile>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={[type.caption, { color: colors.textPrimary, fontFamily: "Inter_700Bold" }]}>
                           {incident.type.replace(/_/g, " ")} · {incident.severity}
                         </Text>
-                        <Text style={[type.caption, { color: colors.textMuted }]}>
+                        <Text style={[type.small, { color: colors.textMuted }]}>
                           {incident.machine_id} ·{" "}
                           {incident.operator_id ? `confirmed by ${incident.operator_id}` : "anonymized — unconfirmed"}
                         </Text>
@@ -149,34 +129,123 @@ export function SupervisorScreen() {
                 )}
               </Card>
             </Animated.View>
-          ) : null}
-        </ScrollView>
-      </SafeAreaView>
-    </ScreenBackground>
+          ) : null
+        }
+        side={
+          <>
+            {overview ? (
+              <Animated.View entering={FadeInDown.delay(60).duration(350)}>
+                <Card>
+                  <CardHeader eyebrow="Today" title="Today's tasks" />
+                  <View style={styles.chipRow}>
+                    {Object.entries(overview.today_task_status).map(([status, count]) => (
+                      <Badge key={status} label={`${status}: ${count}`} tone="neutral" />
+                    ))}
+                    {Object.keys(overview.today_task_status).length === 0 ? (
+                      <Text style={[type.caption, { color: colors.textMuted }]}>No tasks scheduled today.</Text>
+                    ) : null}
+                  </View>
+                </Card>
+              </Animated.View>
+            ) : null}
+
+            {hotspots ? (
+              <Animated.View entering={FadeInDown.delay(100).duration(350)}>
+                <Card>
+                  <CardHeader eyebrow="Patterns" title="Near-miss hotspots" />
+                  <View style={styles.hotspotGrid}>
+                    <HotspotFact label="Total" value={String(hotspots.total_near_misses)} colors={colors} />
+                    <HotspotFact label="Worst hour" value={`${hotspots.worst_hour}:00`} colors={colors} />
+                    <HotspotFact label="Worst sector" value={String(hotspots.worst_sector)} colors={colors} />
+                    <HotspotFact label="Worst condition" value={String(hotspots.worst_condition)} colors={colors} />
+                  </View>
+                  <Text style={[type.label, { color: colors.textMuted, fontSize: 10, marginTop: spacing.xs }]}>BY MACHINE</Text>
+                  <View style={styles.chipRow}>
+                    {Object.entries(hotspots.by_machine)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 6)
+                      .map(([machine, count]) => (
+                        <Badge key={machine} label={`${machine}: ${count}`} tone="neutral" />
+                      ))}
+                  </View>
+                </Card>
+              </Animated.View>
+            ) : null}
+          </>
+        }
+      />
+    </Page>
+  );
+}
+
+function Stat({
+  icon,
+  label,
+  value,
+  colors,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  colors: ReturnType<typeof useColors>;
+  tone?: "safe" | "caution";
+}) {
+  return (
+    <Card>
+      <View style={styles.statTop}>
+        <IconTile bg={tone === "caution" ? colors.cautionSoft : tone === "safe" ? colors.safeSoft : colors.surfaceRaised} size={30}>
+          {icon}
+        </IconTile>
+        <Text style={[type.small, { color: colors.textSecondary, flex: 1 }]}>{label}</Text>
+      </View>
+      <Text style={[type.metric, { color: colors.textPrimary }]}>{value}</Text>
+    </Card>
+  );
+}
+
+function HotspotFact({ label, value, colors }: { label: string; value: string; colors: ReturnType<typeof useColors> }) {
+  return (
+    <View style={styles.hotspotCell}>
+      <Text style={[type.small, { color: colors.textMuted, fontSize: 11 }]}>{label}</Text>
+      <Text style={[type.h2, { color: colors.textPrimary }]}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  content: {
+  banner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm + 2,
+    borderWidth: 1,
+    borderRadius: radius.md,
     padding: spacing.md,
-    paddingBottom: spacing.xxl,
-    gap: spacing.md,
   },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.xs,
+    gap: 6,
   },
-  rowBetween: {
+  statTop: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: spacing.sm + 2,
+  },
+  hotspotGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: spacing.md,
+  },
+  hotspotCell: {
+    width: "50%",
+    gap: 3,
   },
   incidentRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
+    gap: spacing.sm + 2,
+    paddingTop: spacing.sm + 2,
+    borderTopWidth: 1,
   },
 });

@@ -1,13 +1,12 @@
 import * as Haptics from "expo-haptics";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
-import { CheckIcon } from "../components/icons";
+import { CheckIcon, ClockIcon } from "../components/icons";
+import { CardHeader, Columns, Page } from "../components/Page";
 import { PrimaryButton } from "../components/PrimaryButton";
-import { ScreenBackground } from "../components/ScreenBackground";
 import { YoutubeEmbed } from "../components/YoutubeEmbed";
 import { trainingLibrary, type Lesson, type LessonCategory } from "../content/trainingLibrary";
 import { useTrainingProgressStore } from "../store/trainingProgress";
@@ -32,147 +31,160 @@ export function LessonDetailScreen() {
 
   if (!lesson) {
     return (
-      <ScreenBackground>
-        <SafeAreaView style={styles.screen} edges={["top"]}>
-          <Text style={[type.body, { color: colors.textPrimary, padding: spacing.md }]}>Lesson not found.</Text>
-        </SafeAreaView>
-      </ScreenBackground>
+      <Page title="Lesson not found." showBack="always">
+        <PrimaryButton label="Back to library" onPress={() => router.back()} variant="secondary" fullWidth={false} />
+      </Page>
     );
   }
 
   return (
-    <ScreenBackground>
-      <SafeAreaView style={styles.screen} edges={["top"]}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            onPress={() => router.back()}
-            style={styles.backRow}
-          >
-            <Text style={[type.body, { color: colors.textSecondary }]}>{"‹ Back"}</Text>
-          </Pressable>
+    <Page
+      eyebrow={`Training · ${lesson.category}`}
+      title={lesson.title}
+      subtitle={lesson.summary}
+      right={<Badge label={lesson.category} tone={categoryTone[lesson.category]} />}
+      showBack="always"
+    >
+      <View style={styles.metaRow}>
+        <View style={styles.metaItem}>
+          <ClockIcon color={colors.textMuted} size={13} />
+          <Text style={[type.small, { color: colors.textSecondary }]}>{lesson.durationMin} min</Text>
+        </View>
+        <Badge label={lesson.languages.join("/")} tone="neutral" />
+        <Badge label={lesson.videoUri ? "Video" : "Text lesson"} tone="neutral" />
+        {lesson.downloadedOffline ? <Badge label="Downloaded" tone="safe" /> : null}
+      </View>
 
-          <View style={styles.headerRow}>
-            <Text style={[type.display, { color: colors.textPrimary, flex: 1 }]}>{lesson.title}</Text>
-            <Badge label={lesson.category} tone={categoryTone[lesson.category]} />
-          </View>
-          <Text style={[type.body, { color: colors.textMuted }]}>{lesson.summary}</Text>
-
-          <View style={styles.metaRow}>
-            <Badge label={`${lesson.durationMin} min`} tone="neutral" />
-            <Badge label={lesson.languages.join("/")} tone="neutral" />
-            <Badge label={lesson.videoUri ? "Video" : "Text lesson"} tone="neutral" />
-            {lesson.downloadedOffline ? <Badge label="Downloaded" tone="safe" /> : null}
-          </View>
-
-          {lesson.videoUri ? (
-            <View style={{ gap: spacing.xs }}>
-              <YoutubeEmbed videoId={lesson.videoUri} />
-              {lesson.videoSource ? (
-                <Text style={[type.caption, { color: colors.textMuted }]}>{lesson.videoSource}</Text>
-              ) : null}
-            </View>
-          ) : null}
-
-          <Card>
-            <Text style={[type.caption, { color: colors.textMuted }]}>OBJECTIVE</Text>
-            <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>{lesson.objective}</Text>
-          </Card>
-
-          <View style={{ gap: spacing.sm }}>
-            {lesson.body.map((paragraph, i) => (
-              <Text key={i} style={[type.body, { color: colors.textPrimary, lineHeight: 24 }]}>
-                {paragraph}
-              </Text>
-            ))}
-          </View>
-
-          <Card>
-            <Text style={[type.caption, { color: colors.textMuted }]}>KEY STEPS</Text>
-            {lesson.keySteps.map((step, i) => (
-              <View key={i} style={styles.stepRow}>
-                <Text style={[type.bodyStrong, { color: colors.accent }]}>{i + 1}.</Text>
-                <Text style={[type.body, { color: colors.textPrimary, flex: 1 }]}>{step}</Text>
-              </View>
-            ))}
-            {lesson.standardRef ? (
-              <Text style={[type.caption, { color: colors.textMuted }]}>Reference: {lesson.standardRef}</Text>
+      <Columns
+        sideWidth={340}
+        main={
+          <>
+            {lesson.videoUri ? (
+              <Card style={styles.videoCard}>
+                <YoutubeEmbed videoId={lesson.videoUri} />
+                {lesson.videoSource ? (
+                  <Text style={[type.small, { color: colors.textMuted, padding: spacing.md - 2 }]}>{lesson.videoSource}</Text>
+                ) : null}
+              </Card>
             ) : null}
-          </Card>
 
-          <Pressable
-            onPress={() => {
-              Haptics.selectionAsync();
-              if (completed) markLessonIncomplete(lesson.id);
-              else markLessonComplete(lesson.id);
-            }}
-            style={[
-              styles.completeRow,
-              { borderColor: completed ? colors.safe : colors.border, backgroundColor: completed ? `${colors.safe}17` : colors.surface },
-            ]}
-          >
-            <View
+            <Card>
+              <CardHeader eyebrow="Lesson" title="What to know" />
+              {lesson.body.map((paragraph, i) => (
+                <Text key={i} style={[type.body, { color: colors.textPrimary, lineHeight: 24 }]}>
+                  {paragraph}
+                </Text>
+              ))}
+            </Card>
+          </>
+        }
+        side={
+          <>
+            <View style={[styles.objective, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+              <Text style={[type.label, { color: colors.textSecondary, fontSize: 10 }]}>OBJECTIVE</Text>
+              <Text style={[type.caption, { color: colors.textPrimary, fontFamily: "Inter_700Bold", lineHeight: 20 }]}>
+                {lesson.objective}
+              </Text>
+            </View>
+
+            <Card>
+              <CardHeader eyebrow="Checklist" title="Key steps" />
+              {lesson.keySteps.map((step, i) => (
+                <View key={i} style={styles.stepRow}>
+                  <View style={[styles.stepNum, { backgroundColor: colors.accent }]}>
+                    <Text style={[type.small, { color: colors.accentOn, fontFamily: "Inter_700Bold", fontSize: 11 }]}>{i + 1}</Text>
+                  </View>
+                  <Text style={[type.caption, { color: colors.textPrimary, flex: 1, lineHeight: 20 }]}>{step}</Text>
+                </View>
+              ))}
+              {lesson.standardRef ? (
+                <Text style={[type.small, { color: colors.textMuted }]}>Reference: {lesson.standardRef}</Text>
+              ) : null}
+            </Card>
+
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync();
+                if (completed) markLessonIncomplete(lesson.id);
+                else markLessonComplete(lesson.id);
+              }}
               style={[
-                styles.completeCheckbox,
-                { borderColor: completed ? colors.safe : colors.border, backgroundColor: completed ? colors.safe : "transparent" },
+                styles.completeRow,
+                { borderColor: completed ? `${colors.safe}66` : colors.borderStrong, backgroundColor: completed ? colors.safeSoft : colors.surface },
               ]}
             >
-              {completed ? <CheckIcon color={colors.mode === "light" ? "#FFFFFF" : colors.bg} size={16} /> : null}
-            </View>
-            <Text style={[type.bodyStrong, { color: completed ? colors.safe : colors.textPrimary }]}>
-              {completed ? "Completed" : "Mark as complete"}
-            </Text>
-          </Pressable>
+              <View
+                style={[
+                  styles.completeCheckbox,
+                  { borderColor: completed ? colors.safe : colors.borderStrong, backgroundColor: completed ? colors.safe : "transparent" },
+                ]}
+              >
+                {completed ? <CheckIcon color="#FFFFFF" size={14} /> : null}
+              </View>
+              <Text style={[type.caption, { color: completed ? colors.safe : colors.textPrimary, fontFamily: "Inter_600SemiBold" }]}>
+                {completed ? "Completed" : "Mark as complete"}
+              </Text>
+            </Pressable>
 
-          <PrimaryButton label="Back to library" onPress={() => router.back()} variant="secondary" />
-        </ScrollView>
-      </SafeAreaView>
-    </ScreenBackground>
+            <PrimaryButton label="Back to library" onPress={() => router.back()} variant="secondary" />
+          </>
+        }
+      />
+    </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  content: {
-    padding: spacing.md,
-    paddingBottom: spacing.xxl,
-    gap: spacing.md,
-  },
-  backRow: {
-    minHeight: touchTarget,
-    justifyContent: "center",
-    alignSelf: "flex-start",
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.sm,
-  },
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.xs,
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: -spacing.xs,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  videoCard: {
+    padding: 0,
+    gap: 0,
+    overflow: "hidden",
+  },
+  objective: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: 6,
   },
   stepRow: {
     flexDirection: "row",
-    gap: spacing.sm,
+    gap: spacing.sm + 2,
     alignItems: "flex-start",
+  },
+  stepNum: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
   },
   completeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.sm + 2,
     minHeight: touchTarget,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
   },
   completeCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 7,
-    borderWidth: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
   },

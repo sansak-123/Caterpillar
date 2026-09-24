@@ -1,81 +1,93 @@
 import * as Haptics from "expo-haptics";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Circle } from "react-native-svg";
 
+import { useColors } from "../theme/useColors";
 import { radius, spacing, type } from "../theme/tokens";
+import { ArrowRightIcon } from "./icons";
 
-function ArrowRightIcon({ color }: { color: string }) {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      <Path d="M5 12h14M13 6l6 6-6 6" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
+// Dark featured banner (the reference "Featured exercise" hero): near-black panel,
+// yellow headline, outlined eyebrow chip, yellow call-to-action, faint ring motif.
 export function InsightCard({
   eyebrow,
   headline,
+  body,
   actionLabel,
   onPress,
+  testID,
 }: {
   eyebrow: string;
   headline: string;
+  body?: string;
   actionLabel: string;
   onPress: () => void;
+  testID?: string;
 }) {
+  const colors = useColors();
   return (
-    <LinearGradient
-      colors={["#FFD866", "#FFC72C", "#F0A500"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.card}
-    >
-      <View style={styles.eyebrowPill}>
-        <Text style={[type.label, styles.eyebrowText]}>{eyebrow}</Text>
+    <View style={[styles.card, { backgroundColor: colors.hero }]}>
+      <View style={styles.rings} pointerEvents="none">
+        <Svg width={220} height={220}>
+          <Circle cx={150} cy={150} r={95} stroke={colors.heroText} strokeOpacity={0.12} strokeWidth={22} fill="none" />
+          <Circle cx={150} cy={150} r={45} stroke={colors.heroText} strokeOpacity={0.08} strokeWidth={14} fill="none" />
+        </Svg>
       </View>
-      <Text style={[type.h1, styles.headline]}>{headline}</Text>
+      <View style={[styles.eyebrowPill, { borderColor: `${colors.heroText}66`, backgroundColor: `${colors.heroText}1F` }]}>
+        <Text style={[type.label, { color: colors.heroText, fontSize: 10 }]}>{eyebrow.toUpperCase()}</Text>
+      </View>
+      <Text style={[type.h1, { color: colors.heroText }]}>{headline}</Text>
+      {body ? <Text style={[type.caption, styles.body, { color: `${colors.heroText}CC` }]}>{body}</Text> : null}
       <Pressable
+        testID={testID}
+        accessibilityRole="button"
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onPress();
         }}
-        style={styles.actionRow}
+        style={[styles.action, { backgroundColor: colors.accent }]}
       >
-        <Text style={styles.actionText}>{actionLabel}</Text>
-        <ArrowRightIcon color="#1A1A1A" />
+        <Text style={[styles.actionText, { color: colors.accentOn }]}>{actionLabel}</Text>
+        <ArrowRightIcon color={colors.accentOn} size={14} />
       </Pressable>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    gap: spacing.sm,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    gap: spacing.sm + 2,
+    overflow: "hidden",
+  },
+  rings: {
+    position: "absolute",
+    right: -40,
+    bottom: -60,
   },
   eyebrowPill: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(26,26,26,0.14)",
-    borderRadius: radius.pill,
-    paddingVertical: 4,
+    borderWidth: 1,
+    borderRadius: radius.sm - 2,
+    paddingVertical: 3,
     paddingHorizontal: spacing.sm,
   },
-  eyebrowText: {
-    color: "#1A1A1A",
+  body: {
+    maxWidth: 520,
+    lineHeight: 20,
   },
-  headline: {
-    color: "#1A1A1A",
-  },
-  actionRow: {
+  action: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
+    alignSelf: "flex-start",
+    gap: spacing.sm,
+    borderRadius: radius.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
     marginTop: spacing.xs,
   },
   actionText: {
-    ...type.bodyStrong,
-    color: "#1A1A1A",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
   },
 });

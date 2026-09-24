@@ -8,10 +8,12 @@ import {
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
+  Inter_800ExtraBold,
 } from "@expo-google-fonts/inter";
 
 import "../i18n"; // side-effect: initializes i18next once, before any screen renders translated text
 
+import { AppShell } from "../components/AppShell";
 import { ensureDemoSession } from "../lib/api/client";
 import { useSyncEngine } from "../lib/sync/engine";
 import { useAuthStore } from "../store/auth";
@@ -26,6 +28,7 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    Inter_800ExtraBold,
   });
 
   // Bootstrapped once, here, rather than by whichever screen happens to mount first —
@@ -55,57 +58,32 @@ export default function RootLayout() {
   // flashing from the system font to Inter a moment after first paint.
   if (!fontsLoaded) return null;
 
+  // Checklist / shift log / supervisor / demo render their own page header (with a
+  // Back link on phones, and the sidebar on wide screens), so only the simulator keeps
+  // a native header.
   return (
     <SafeAreaProvider>
       <StatusBar style={colors.mode === "light" ? "dark" : "light"} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="checklist"
-          options={{
-            headerShown: true,
-            title: "Pre-Start Checklist",
-            headerStyle: { backgroundColor: colors.surface },
-            headerTintColor: colors.textPrimary,
-          }}
-        />
-        <Stack.Screen
-          name="shift-log"
-          options={{
-            headerShown: true,
-            title: "End-of-Shift Log",
-            headerStyle: { backgroundColor: colors.surface },
-            headerTintColor: colors.textPrimary,
-          }}
-        />
-        <Stack.Screen
-          name="demo"
-          options={{
-            headerShown: true,
-            title: "Demo Panel",
-            headerStyle: { backgroundColor: colors.surface },
-            headerTintColor: colors.textPrimary,
-          }}
-        />
-        <Stack.Screen
-          name="simulator"
-          options={{
-            headerShown: true,
-            title: "Simulator",
-            headerStyle: { backgroundColor: colors.surface },
-            headerTintColor: colors.textPrimary,
-          }}
-        />
-        <Stack.Screen
-          name="supervisor"
-          options={{
-            headerShown: true,
-            title: "Supervisor View",
-            headerStyle: { backgroundColor: colors.surface },
-            headerTintColor: colors.textPrimary,
-          }}
-        />
-      </Stack>
+      <AppShell>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="checklist" options={{ title: "Pre-start check" }} />
+          <Stack.Screen name="shift-log" options={{ title: "Shift log" }} />
+          <Stack.Screen name="demo" options={{ title: "Demo panel" }} />
+          <Stack.Screen
+            name="simulator"
+            options={{
+              headerShown: true,
+              title: "Simulator",
+              headerShadowVisible: false,
+              headerStyle: { backgroundColor: colors.bg },
+              headerTintColor: colors.textPrimary,
+              headerTitleStyle: { fontFamily: "Inter_700Bold", fontSize: 16 },
+            }}
+          />
+          <Stack.Screen name="supervisor" options={{ title: "Supervisor" }} />
+        </Stack>
+      </AppShell>
     </SafeAreaProvider>
   );
 }

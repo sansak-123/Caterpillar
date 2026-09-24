@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Path, Rect, Stop } from "react-native-svg";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -9,17 +9,14 @@ import type { TFunction } from "i18next";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 
+import { DEMO_MACHINE_MODEL, DEMO_OPERATOR_NAME } from "../components/AppShell";
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
-import { ConnectivityPill } from "../components/ConnectivityPill";
 import { GlassCard } from "../components/GlassCard";
-import { CheckIcon, FlaskIcon, HazardIcon, SpeakerIcon } from "../components/icons";
-import { InsightCard } from "../components/InsightCard";
-import { LanguageSwitcher } from "../components/LanguageSwitcher";
+import { ArrowRightIcon, CheckIcon, ClipboardIcon, HazardIcon, PinIcon, SpeakerIcon, ShieldIcon } from "../components/icons";
+import { CardHeader, Columns, Divider, Grid, Page, SectionTitle } from "../components/Page";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ProgressRing } from "../components/ProgressRing";
-import { ScreenBackground } from "../components/ScreenBackground";
-import { ThemeToggle } from "../components/ThemeToggle";
 import { PRE_START_CHECKLIST } from "../content/preStartChecklist";
 import { DEMO_MACHINE_ID, fetchTasksToday, type ApiTask } from "../lib/api/client";
 import { localeFor } from "../lib/assistant/voice";
@@ -29,8 +26,9 @@ import { useAuthStore } from "../store/auth";
 import { useChecklistStore } from "../store/checklist";
 import { useConnectivityStore } from "../store/connectivity";
 import { useLanguageStore } from "../store/language";
+import { useIsWide } from "../theme/useLayout";
 import { useColors } from "../theme/useColors";
-import { radius, shadow, spacing, touchTarget, type } from "../theme/tokens";
+import { radius, spacing, type } from "../theme/tokens";
 
 type TaskStatus = "pending" | "in_progress" | "done";
 
@@ -166,16 +164,20 @@ function TaskBody({
     caution: t("risk.caution"),
     danger: t("risk.danger"),
   };
+  const colorsForRisk = { safe: colors.safe, caution: colors.caution, danger: colors.danger };
   return (
     // Card/GlassCard apply `gap` to their own direct children — this wrapper (needed so
     // Maestro/testID can address one task's contents specifically, since two upcoming
     // tasks otherwise render identical text/labels) reproduces that same gap itself so
     // the internal spacing doesn't collapse now that Card only sees one child.
-    <View testID={`task-card-${task.id}`} style={{ gap: spacing.sm }}>
+    <View testID={`task-card-${task.id}`} style={{ gap: spacing.sm + 2 }}>
       <View style={styles.taskHeader}>
-        <Text style={[type.bodyStrong, { color: colors.textPrimary, flex: 1 }]} numberOfLines={2}>
-          {task.title}
-        </Text>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[type.label, { color: colors.textMuted, fontSize: 10 }]}>{task.id}</Text>
+          <Text style={[type.bodyStrong, { color: colors.textPrimary }]} numberOfLines={2}>
+            {task.title}
+          </Text>
+        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Read task aloud"
@@ -184,41 +186,42 @@ function TaskBody({
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             onSpeak();
           }}
-          style={styles.speakerButton}
+          style={[styles.speakerButton, { borderColor: colors.border, backgroundColor: colors.surfaceSunken }]}
         >
-          <SpeakerIcon color={colors.textSecondary} size={20} />
+          <SpeakerIcon color={colors.textSecondary} size={17} />
         </Pressable>
-        {task.status === "in_progress" ? <Badge label={t("today.inProgress")} tone="info" /> : null}
       </View>
 
       <View style={styles.taskMetaRow}>
-        <Badge label={task.weather} tone="neutral" />
+        {task.status === "in_progress" ? <Badge label={t("today.inProgress")} tone="info" /> : null}
         <Badge label={riskLabel[task.risk]} tone={task.risk} />
+        <Badge label={task.weather} tone="neutral" />
         {task.depth !== "—" ? <Badge label={`${t("task.depth")} ${task.depth}`} tone="neutral" /> : null}
       </View>
 
       {task.hazards.length ? (
-        <View style={styles.hazardBox}>
-          <HazardIcon color={colors.caution} size={16} />
-          <Text style={[type.caption, { color: colors.textSecondary, flex: 1 }]}>
-            {task.hazards.join(" · ")}
-          </Text>
+        <View style={[styles.hazardBox, { backgroundColor: colors.cautionSoft }]}>
+          <HazardIcon color={colors.caution} size={15} />
+          <Text style={[type.small, { color: colors.textPrimary, flex: 1 }]}>{task.hazards.join(" · ")}</Text>
         </View>
       ) : null}
 
-      <Text style={type.caption}>
-        <Text style={{ color: colors.textMuted }}>{t("task.est")} </Text>
-        <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{task.p50Min}</Text>
-        <Text style={{ color: colors.textMuted }}>–{task.p90Min} {t("task.minRange")}</Text>
-      </Text>
+      <View style={[styles.estimateRow, { borderTopColor: colors.border }]}>
+        <View style={[styles.riskBar, { backgroundColor: colorsForRisk[task.risk] }]} />
+        <Text style={type.caption}>
+          <Text style={{ color: colors.textMuted }}>{t("task.est")} </Text>
+          <Text style={{ color: colors.textPrimary, fontFamily: "Inter_700Bold", fontSize: 16 }}>{task.p50Min}</Text>
+          <Text style={{ color: colors.textMuted }}>–{task.p90Min} {t("task.minRange")}</Text>
+        </Text>
+      </View>
 
       {offlineEstimate ? (
         // CLAUDE.md §3.1: offline re-scoring uses the on-device ONNX model and must be
         // marked "approximate (offline)" — never presented as equivalent to the
         // server's fully-informed, SHAP-explained estimate from morning sync.
-        <Text style={[type.caption, { fontStyle: "italic" }]}>
+        <Text style={[type.small, { fontStyle: "italic" }]}>
           <Text style={{ color: colors.textMuted }}>{t("task.reScoredOffline")} </Text>
-          <Text style={{ color: colors.textSecondary, fontWeight: "700" }}>{offlineEstimate.p50}</Text>
+          <Text style={{ color: colors.textSecondary, fontFamily: "Inter_700Bold" }}>{offlineEstimate.p50}</Text>
           <Text style={{ color: colors.textMuted }}>–{offlineEstimate.p90} {t("task.minApproximate")}</Text>
         </Text>
       ) : null}
@@ -345,245 +348,328 @@ export function TodayScreen() {
   const upcoming = tasks.filter((t) => t.status !== "in_progress");
   const doneCount = tasks.filter((t) => t.status === "done").length;
 
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const dateLabel = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const checklistDone = checkedCount === PRE_START_CHECKLIST.length;
+  const firstName = DEMO_OPERATOR_NAME.split(" ")[0];
+
   return (
-    <ScreenBackground>
-      <SafeAreaView style={styles.screen} edges={["top"]}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={[type.label, { color: colors.textMuted }]}>WED, 1 MAY</Text>
-              <Text style={[type.display, { color: colors.textPrimary }]}>{t("today.title")}</Text>
-            </View>
-            <View style={styles.headerActions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Demo panel"
-                testID="open-demo-panel"
-                onPress={() => router.push("/demo")}
-                style={[styles.iconButton, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}
-              >
-                <FlaskIcon color={colors.textSecondary} size={18} />
-              </Pressable>
-              <LanguageSwitcher />
-              <ThemeToggle />
-              <ConnectivityPill />
-            </View>
-          </View>
-
-          <Animated.View entering={FadeInDown.duration(400)}>
-            <InsightCard
-              eyebrow="Assistant insight"
-              headline="Rain moves in at 2pm — the Trenching task will likely overrun by ~15 min."
-              actionLabel="Ask about today's plan"
-              onPress={() => {}}
-            />
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(80).duration(400)}>
-            <Card style={styles.progressCard}>
-              <View style={styles.progressTop}>
-                <ProgressRing
-                  progress={tasks.length ? doneCount / tasks.length : 0}
-                  size={92}
-                  strokeWidth={9}
-                  color={colors.accent}
-                  trackColor={colors.ringTrack}
-                  value={`${doneCount}/${tasks.length}`}
-                  valueColor={colors.textPrimary}
-                />
-                <View style={styles.progressText}>
-                  <Text style={[type.h2, { color: colors.textPrimary }]}>OP1001 · {DEMO_MACHINE_ID}</Text>
-                  <Text style={[type.caption, { color: colors.textMuted }]}>
-                    {t("today.tasksScheduled", { count: tasks.length })} — {t("today.reorderAnytime")}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.statusList}>
-                <StatusRow
-                  ok={checkedCount === PRE_START_CHECKLIST.length}
-                  label={`Pre-start checklist ${checkedCount}/${PRE_START_CHECKLIST.length}`}
-                  colors={colors}
-                />
-                <StatusRow ok={doneCount === tasks.length && tasks.length > 0} label={`${doneCount}/${tasks.length} tasks complete`} colors={colors} />
-                <StatusRow
-                  ok={!devNetworkCut && connectivityStatus === "online"}
-                  label={devNetworkCut ? "Offline (dev mode)" : connectivityStatus === "online" ? "Synced" : "Syncing…"}
-                  colors={colors}
-                />
-              </View>
-            </Card>
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(110).duration(400)}>
-            <View style={styles.shiftToolsRow}>
-              <ShiftToolButton
-                label={t("quickActions.preStartChecklist")}
-                sublabel={t("quickActions.doneCount", { done: checkedCount, total: PRE_START_CHECKLIST.length })}
-                onPress={() => router.push("/checklist")}
+    <Page
+      eyebrow={`${dateLabel} · Day shift`}
+      title={`${greeting}, ${firstName}`}
+      subtitle="Here's what's happening on your site today."
+      status={{ label: "On shift", tone: "safe" }}
+    >
+      <Columns
+        main={
+          <>
+            <Animated.View entering={FadeInDown.duration(400)}>
+              <MachineCard
                 colors={colors}
-                testID="open-checklist"
+                planLabel={(inProgress ?? tasks[0])?.title ?? "—"}
+                checklistLabel={`${t("quickActions.preStartChecklist")} · ${t("quickActions.doneCount", {
+                  done: checkedCount,
+                  total: PRE_START_CHECKLIST.length,
+                })}`}
+                shiftLogLabel={t("quickActions.endOfShiftLog")}
               />
-              <ShiftToolButton
-                label={t("quickActions.endOfShiftLog")}
-                sublabel={t("quickActions.autoFilled")}
-                onPress={() => router.push("/shift-log")}
-                colors={colors}
-                testID="open-shift-log"
-              />
-            </View>
-          </Animated.View>
-
-          {inProgress ? (
-            <Animated.View entering={FadeInDown.delay(140).duration(400)}>
-              <GlassCard glowColor={colors.infoGlow} style={styles.heroTask}>
-                <Text style={[type.label, { color: colors.info }]}>{t("today.inProgress").toUpperCase()}</Text>
-                <TaskBody
-                  task={inProgress}
-                  colors={colors}
-                  t={t}
-                  onStart={() => changeTaskStatus(inProgress, "in_progress")}
-                  onPause={() => changeTaskStatus(inProgress, "pending")}
-                  onComplete={() => changeTaskStatus(inProgress, "done")}
-                  onSpeak={() => speakTask(inProgress, t, language)}
-                  offlineEstimate={offlineEstimates[inProgress.id]}
-                />
-              </GlassCard>
             </Animated.View>
-          ) : null}
 
-          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>{t("today.upNext")}</Text>
-          <View style={styles.taskList}>
-            {upcoming.map((task, i) => (
-              <Animated.View key={task.id} entering={FadeInDown.delay(200 + i * 70).duration(400)}>
-                <Card accentColor={colors[task.risk]}>
+            {inProgress ? (
+              <Animated.View entering={FadeInDown.delay(80).duration(400)}>
+                <GlassCard glowColor={colors.info} style={styles.heroTask}>
+                  <View style={styles.heroEyebrow}>
+                    <View style={[styles.pulseDot, { backgroundColor: colors.info }]} />
+                    <Text style={[type.label, { color: colors.info, fontSize: 10 }]}>{t("today.inProgress").toUpperCase()}</Text>
+                  </View>
                   <TaskBody
-                    task={task}
+                    task={inProgress}
                     colors={colors}
                     t={t}
-                    onStart={() => changeTaskStatus(task, "in_progress")}
-                    onPause={() => changeTaskStatus(task, "pending")}
-                    onComplete={() => changeTaskStatus(task, "done")}
-                    onSpeak={() => speakTask(task, t, language)}
-                    offlineEstimate={offlineEstimates[task.id]}
+                    onStart={() => changeTaskStatus(inProgress, "in_progress")}
+                    onPause={() => changeTaskStatus(inProgress, "pending")}
+                    onComplete={() => changeTaskStatus(inProgress, "done")}
+                    onSpeak={() => speakTask(inProgress, t, language)}
+                    offlineEstimate={offlineEstimates[inProgress.id]}
                   />
-                </Card>
+                </GlassCard>
               </Animated.View>
-            ))}
+            ) : null}
+
+            <SectionTitle title={t("today.upNext")} right={`${t("today.tasksScheduled", { count: tasks.length })} — ${t("today.reorderAnytime")}`} />
+            <Grid cols={2}>
+              {upcoming.map((task, i) => (
+                <Animated.View key={task.id} entering={FadeInDown.delay(160 + i * 70).duration(400)}>
+                  <Card>
+                    <TaskBody
+                      task={task}
+                      colors={colors}
+                      t={t}
+                      onStart={() => changeTaskStatus(task, "in_progress")}
+                      onPause={() => changeTaskStatus(task, "pending")}
+                      onComplete={() => changeTaskStatus(task, "done")}
+                      onSpeak={() => speakTask(task, t, language)}
+                      offlineEstimate={offlineEstimates[task.id]}
+                    />
+                  </Card>
+                </Animated.View>
+              ))}
+            </Grid>
+          </>
+        }
+        side={
+          <>
+            <Animated.View entering={FadeInDown.delay(60).duration(400)}>
+              <Card>
+                <CardHeader
+                  eyebrow="Your shift today"
+                  title={doneCount === tasks.length && tasks.length > 0 ? "Day plan complete" : "On the right track"}
+                  subtitle={`OP1001 · ${DEMO_MACHINE_ID}`}
+                  right={<ShieldIcon color={colors.safe} size={20} />}
+                />
+                <View style={styles.progressTop}>
+                  <ProgressRing
+                    progress={tasks.length ? doneCount / tasks.length : 0}
+                    size={96}
+                    strokeWidth={9}
+                    color={colors.safe}
+                    trackColor={colors.ringTrack}
+                    value={`${doneCount}/${tasks.length}`}
+                    label="TASKS"
+                    valueColor={colors.textPrimary}
+                  />
+                  <View style={styles.statusList}>
+                    <StatusRow
+                      ok={checklistDone}
+                      label={`Pre-start checklist ${checkedCount}/${PRE_START_CHECKLIST.length}`}
+                      colors={colors}
+                    />
+                    <StatusRow ok={doneCount === tasks.length && tasks.length > 0} label={`${doneCount}/${tasks.length} tasks complete`} colors={colors} />
+                    <StatusRow
+                      ok={!devNetworkCut && connectivityStatus === "online"}
+                      label={devNetworkCut ? "Offline (dev mode)" : connectivityStatus === "online" ? "Synced" : "Syncing…"}
+                      colors={colors}
+                    />
+                  </View>
+                </View>
+              </Card>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(120).duration(400)}>
+              <Card>
+                <CardHeader eyebrow="Assistant insight" title="Weather watch" />
+                <Text style={[type.caption, { color: colors.textSecondary, lineHeight: 20 }]}>
+                  Rain moves in at 2pm — the Trenching task will likely overrun by ~15 min.
+                </Text>
+                <Pressable onPress={() => {}} style={styles.linkRow}>
+                  <Text style={[type.small, { color: colors.textPrimary, fontFamily: "Inter_600SemiBold" }]}>
+                    Ask about today&apos;s plan
+                  </Text>
+                  <ArrowRightIcon color={colors.textPrimary} size={13} />
+                </Pressable>
+              </Card>
+            </Animated.View>
+
+            {!checklistDone ? (
+              <Animated.View entering={FadeInDown.delay(160).duration(400)}>
+                <View style={[styles.callout, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+                  <View style={styles.calloutTitle}>
+                    <ClipboardIcon color={colors.caution} size={16} />
+                    <Text style={[type.caption, { color: colors.textPrimary, fontFamily: "Inter_700Bold" }]}>
+                      Before you get moving
+                    </Text>
+                  </View>
+                  <Text style={[type.small, { color: colors.textSecondary, lineHeight: 18 }]}>
+                    Complete your pre-start walkaround — {PRE_START_CHECKLIST.length - checkedCount} of{" "}
+                    {PRE_START_CHECKLIST.length} checks left.
+                  </Text>
+                  <Pressable onPress={() => router.push("/checklist")} style={styles.linkRow}>
+                    <Text style={[type.small, { color: colors.textPrimary, fontFamily: "Inter_700Bold", textDecorationLine: "underline" }]}>
+                      Review checklist
+                    </Text>
+                    <ArrowRightIcon color={colors.textPrimary} size={13} />
+                  </Pressable>
+                </View>
+              </Animated.View>
+            ) : null}
+          </>
+        }
+      />
+    </Page>
+  );
+}
+
+// Machine hero card — illustration band + unit facts + the two paperwork shortcuts
+// (pre-start checklist and end-of-shift log, CLAUDE.md §2.1 Rule 5).
+function MachineCard({
+  colors,
+  planLabel,
+  checklistLabel,
+  shiftLogLabel,
+}: {
+  colors: ReturnType<typeof useColors>;
+  planLabel: string;
+  checklistLabel: string;
+  shiftLogLabel: string;
+}) {
+  const isWide = useIsWide();
+  return (
+    <Card style={styles.machineCard}>
+      <MachineIllustration colors={colors} height={isWide ? 190 : 150} />
+      <View style={styles.machineBody}>
+        <View style={styles.machineTitleRow}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[type.h1, { color: colors.textPrimary }]}>{DEMO_MACHINE_MODEL}</Text>
+            <Text style={[type.caption, { color: colors.textSecondary }]}>Hydraulic excavator · Unit {DEMO_MACHINE_ID}</Text>
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    </ScreenBackground>
+          <Badge label="Operational" tone="safe" />
+        </View>
+        <Divider />
+        <View style={styles.factsRow}>
+          <Fact label="Shift hours" value="06:00 – 14:30" colors={colors} />
+          <Fact label="Location" value="Sector B · East dig" colors={colors} icon={<PinIcon color={colors.textSecondary} size={13} />} />
+          <Fact label="Today's plan" value={planLabel} colors={colors} />
+        </View>
+        <View style={styles.actionsRow}>
+          <PrimaryButton
+            testID="open-checklist"
+            label={checklistLabel}
+            onPress={() => router.push("/checklist")}
+            variant="primary"
+            fullWidth={false}
+            iconRight
+            icon={<ArrowRightIcon color={colors.accentOn} size={14} />}
+          />
+          <PrimaryButton
+            testID="open-shift-log"
+            label={shiftLogLabel}
+            onPress={() => router.push("/shift-log")}
+            variant="secondary"
+            fullWidth={false}
+          />
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+function Fact({
+  label,
+  value,
+  colors,
+  icon,
+}: {
+  label: string;
+  value: string;
+  colors: ReturnType<typeof useColors>;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <View style={styles.fact}>
+      <Text style={[type.label, { color: colors.textMuted, fontSize: 10 }]}>{label.toUpperCase()}</Text>
+      <View style={styles.factValue}>
+        {icon}
+        <Text style={[type.caption, { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", flexShrink: 1 }]} numberOfLines={2}>
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// Side-view excavator drawn in SVG (no photo asset needed, scales crisply, themes).
+function MachineIllustration({ colors, height }: { colors: ReturnType<typeof useColors>; height: number }) {
+  const yellow = colors.accent;
+  const dark = "#2B2620";
+  return (
+    <View style={[styles.illustration, { height }]}>
+      <Svg width="100%" height="100%" viewBox="0 0 600 200" preserveAspectRatio="xMidYMid slice">
+        <Defs>
+          <SvgGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.mode === "light" ? "#E9E3D6" : "#2A2721"} />
+            <Stop offset="1" stopColor={colors.mode === "light" ? "#D9D1C0" : "#211E19"} />
+          </SvgGradient>
+        </Defs>
+        <Rect x={0} y={0} width={600} height={200} fill="url(#sky)" />
+        <Path d="M0 160 L600 150 L600 200 L0 200 Z" fill={colors.mode === "light" ? "#BFB5A1" : "#3A352C"} />
+        <Path d="M60 162 Q120 140 190 158 L190 170 L60 172 Z" fill={colors.mode === "light" ? "#A89D87" : "#4A4337"} />
+        {/* tracks */}
+        <Rect x={250} y={140} width={200} height={26} rx={13} fill={dark} />
+        {[265, 290, 315, 340, 365, 390, 415, 435].map((cx) => (
+          <Circle key={cx} cx={cx} cy={153} r={6} fill="#4A443B" />
+        ))}
+        {/* upper structure */}
+        <Rect x={270} y={98} width={170} height={40} rx={6} fill={yellow} />
+        <Rect x={420} y={104} width={34} height={30} rx={4} fill={yellow} />
+        <Rect x={270} y={134} width={184} height={6} fill={dark} opacity={0.35} />
+        {/* cab */}
+        <Path d="M282 98 L282 58 Q282 52 288 52 L330 52 L344 98 Z" fill={yellow} />
+        <Path d="M290 94 L290 60 L326 60 L337 94 Z" fill={dark} opacity={0.85} />
+        {/* boom + stick + bucket */}
+        <Path d="M300 104 L236 40 L220 50 L284 116 Z" fill={yellow} />
+        <Path d="M236 40 L170 96 L182 106 L246 52 Z" fill={yellow} />
+        <Path d="M168 94 L150 128 Q164 140 188 126 L186 104 Z" fill={dark} />
+        <Circle cx={236} cy={44} r={6} fill={dark} />
+        <Circle cx={292} cy={108} r={6} fill={dark} />
+        <Rect x={354} y={112} width={46} height={8} rx={2} fill={dark} opacity={0.5} />
+      </Svg>
+      <View style={[styles.illustrationTag, { backgroundColor: colors.accent }]}>
+        <Text style={[type.label, { color: colors.accentOn, fontSize: 9.5 }]}>YOUR MACHINE</Text>
+      </View>
+    </View>
   );
 }
 
 function StatusRow({ ok, label, colors }: { ok: boolean; label: string; colors: ReturnType<typeof useColors> }) {
   return (
     <View style={styles.statusRow}>
-      <View style={[styles.statusDot, { backgroundColor: ok ? `${colors.safe}22` : `${colors.caution}22` }]}>
-        {ok ? (
-          <CheckIcon color={colors.safe} size={12} />
-        ) : (
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.caution }} />
-        )}
-      </View>
-      <Text style={[type.caption, { color: colors.textSecondary }]}>{label}</Text>
+      {ok ? (
+        <CheckIcon color={colors.safe} size={15} />
+      ) : (
+        <View style={[styles.pendingRing, { borderColor: colors.caution }]} />
+      )}
+      <Text style={[type.small, { color: ok ? colors.textPrimary : colors.caution, flexShrink: 1 }]}>{label}</Text>
     </View>
   );
 }
 
-function ShiftToolButton({
-  label,
-  sublabel,
-  onPress,
-  colors,
-  testID,
-}: {
-  label: string;
-  sublabel: string;
-  onPress: () => void;
-  colors: ReturnType<typeof useColors>;
-  testID?: string;
-}) {
-  return (
-    <Pressable
-      testID={testID}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-      style={[
-        styles.shiftToolButton,
-        { backgroundColor: colors.surface, borderColor: colors.border },
-        shadow.card(colors.mode),
-      ]}
-    >
-      <Text style={[type.bodyStrong, { color: colors.textPrimary }]} numberOfLines={1}>
-        {label}
-      </Text>
-      <Text style={[type.caption, { color: colors.textMuted }]}>{sublabel}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    padding: spacing.md,
-    paddingBottom: spacing.xxl + 72,
-    gap: spacing.md,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
+  heroTask: {
     gap: spacing.sm,
   },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 999,
-    borderWidth: 1,
+  heroEyebrow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 6,
   },
-  progressCard: {
-    gap: spacing.md,
+  pulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   progressTop: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-  },
-  progressText: {
-    flex: 1,
-    gap: 2,
+    marginTop: spacing.xs,
   },
   statusList: {
-    gap: spacing.xs,
+    flex: 1,
+    gap: spacing.sm,
   },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
   },
-  statusDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroTask: {
-    marginTop: spacing.xs,
-  },
-  taskList: {
-    gap: spacing.sm,
+  pendingRing: {
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 2,
+    marginHorizontal: 1,
   },
   taskHeader: {
     flexDirection: "row",
@@ -594,35 +680,99 @@ const styles = StyleSheet.create({
   taskMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.sm,
+    gap: 6,
   },
   speakerButton: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
+    borderRadius: radius.sm,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   hazardBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
+    gap: spacing.sm,
+    borderRadius: radius.sm,
+    paddingVertical: 7,
+    paddingHorizontal: spacing.sm + 2,
+  },
+  estimateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: spacing.sm + 2,
+  },
+  riskBar: {
+    width: 3,
+    height: 16,
+    borderRadius: 2,
   },
   actionsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
-  shiftToolsRow: {
+  machineCard: {
+    padding: 0,
+    gap: 0,
+    overflow: "hidden",
+  },
+  illustration: {
+    width: "100%",
+    overflow: "hidden",
+  },
+  illustrationTag: {
+    position: "absolute",
+    top: 14,
+    left: 14,
+    borderRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+  },
+  machineBody: {
+    padding: spacing.md + 2,
+    gap: spacing.md,
+  },
+  machineTitleRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
     gap: spacing.sm,
   },
-  shiftToolButton: {
+  factsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+  },
+  fact: {
     flex: 1,
-    minHeight: touchTarget,
-    borderRadius: radius.lg,
+    minWidth: 130,
+    gap: 5,
+  },
+  factValue: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingVertical: 2,
+  },
+  callout: {
     borderWidth: 1,
-    padding: spacing.sm,
-    justifyContent: "center",
-    gap: 2,
+    borderRadius: 8,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  calloutTitle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
   },
 });

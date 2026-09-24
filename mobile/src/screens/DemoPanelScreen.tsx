@@ -1,12 +1,12 @@
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
+import { ArrowRightIcon } from "../components/icons";
+import { CardHeader, Columns, Page } from "../components/Page";
 import { PrimaryButton } from "../components/PrimaryButton";
-import { ScreenBackground } from "../components/ScreenBackground";
 import { useConnectivityStore } from "../store/connectivity";
 import { DEMO_BEAT_LABEL, DEMO_BEAT_ORDER, useDemoStore } from "../store/demo";
 import { useColors } from "../theme/useColors";
@@ -38,111 +38,129 @@ export function DemoPanelScreen() {
   const setBeat = useDemoStore((s) => s.setBeat);
 
   return (
-    <ScreenBackground>
-      <SafeAreaView style={styles.screen} edges={["top"]}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={[type.label, { color: colors.textMuted }]}>DEV ONLY</Text>
-          <Text style={[type.display, { color: colors.textPrimary }]}>Demo panel</Text>
-          <Text style={[type.body, { color: colors.textMuted }]}>
-            Not part of the operator-facing app — a presenter control for rehearsing the offline
-            narrative arc.
-          </Text>
-
-          <Card accentColor={devNetworkCut ? colors.danger : colors.safe}>
-            <View style={styles.rowBetween}>
-              <Text style={[type.h2, { color: colors.textPrimary }]}>Cut network</Text>
-              <Switch
-                testID="demo-cut-network-switch"
-                value={devNetworkCut}
-                onValueChange={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  toggleDevNetworkCut();
-                }}
+    <Page
+      eyebrow="Dev only"
+      title="Demo panel"
+      subtitle="Not part of the operator-facing app — a presenter control for rehearsing the offline narrative arc."
+      status={{ label: status, tone: status === "online" ? "safe" : status === "offline" ? "danger" : "caution" }}
+      showBack
+    >
+      <Columns
+        sideWidth={380}
+        main={
+          <>
+            <Card accentColor={devNetworkCut ? colors.danger : colors.safe}>
+              <CardHeader
+                eyebrow="Connectivity"
+                title="Cut network"
+                right={
+                  <Switch
+                    testID="demo-cut-network-switch"
+                    value={devNetworkCut}
+                    trackColor={{ false: colors.surfaceRaised, true: colors.danger }}
+                    onValueChange={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      toggleDevNetworkCut();
+                    }}
+                  />
+                }
               />
-            </View>
-            <Text style={[type.body, { color: colors.textMuted }]}>
-              Forces the sync engine offline even though the backend is reachable — proves the app
-              keeps working without a connection, the same as physically enabling airplane mode.
-            </Text>
-            <View style={styles.rowBetween}>
-              <Text style={[type.body, { color: colors.textMuted }]}>Current status</Text>
-              <Badge label={status} tone={status === "online" ? "safe" : status === "offline" ? "danger" : "caution"} />
+              <Text style={[type.small, { color: colors.textSecondary, lineHeight: 18 }]}>
+                Forces the sync engine offline even though the backend is reachable — proves the app keeps working without a
+                connection, the same as physically enabling airplane mode.
+              </Text>
+              <View style={styles.rowBetween}>
+                <Text style={[type.small, { color: colors.textMuted }]}>Current status</Text>
+                <Badge label={status} tone={status === "online" ? "safe" : status === "offline" ? "danger" : "caution"} />
+              </View>
+            </Card>
+
+            <Card>
+              <CardHeader eyebrow="Live safety" title="Jump to beat" />
+              <Text style={[type.small, { color: colors.textSecondary, lineHeight: 18 }]}>
+                Drives the same live proximity math the Safety tab shows — switch tabs after tapping a beat to see it react in
+                real time (real lib/safety zones, seatbelt alert level, and near-miss trigger, not a canned screenshot).
+              </Text>
+              <View style={styles.beatButtons}>
+                {DEMO_BEAT_ORDER.map((b, i) => (
+                  <Pressable
+                    key={b}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setBeat(b);
+                    }}
+                    style={[
+                      styles.beatButton,
+                      {
+                        backgroundColor: b === activeBeat ? colors.accent : colors.surface,
+                        borderColor: b === activeBeat ? colors.accentPressed : colors.borderStrong,
+                      },
+                    ]}
+                  >
+                    <Text style={[type.label, { color: b === activeBeat ? colors.accentOn : colors.textMuted, fontSize: 9.5 }]}>
+                      BEAT {i + 1}
+                    </Text>
+                    <Text
+                      style={[type.caption, { color: b === activeBeat ? colors.accentOn : colors.textPrimary, fontFamily: "Inter_600SemiBold" }]}
+                      numberOfLines={2}
+                    >
+                      {DEMO_BEAT_LABEL[b]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </Card>
+
+            <PrimaryButton
+              label="Open Supervisor View"
+              onPress={() => router.push("/supervisor")}
+              variant="secondary"
+              fullWidth={false}
+              iconRight
+            icon={<ArrowRightIcon color={colors.textPrimary} size={14} />}
+            />
+          </>
+        }
+        side={
+          <Card>
+            <CardHeader eyebrow="Script" title="Narrative script" />
+            <View style={styles.beatsList}>
+              {NARRATIVE_BEATS.map((beat, i) => (
+                <View key={beat} style={styles.beatRow}>
+                  <View style={[styles.stepNum, { backgroundColor: colors.surfaceRaised }]}>
+                    <Text style={[type.small, { color: colors.textSecondary, fontFamily: "Inter_700Bold", fontSize: 11 }]}>{i + 1}</Text>
+                  </View>
+                  <Text style={[type.small, { color: colors.textPrimary, flex: 1, lineHeight: 18 }]}>{beat}</Text>
+                </View>
+              ))}
             </View>
           </Card>
-
-          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Jump to beat (Safety tab)</Text>
-          <Text style={[type.body, { color: colors.textMuted }]}>
-            Drives the same live proximity math the Safety tab shows — switch tabs after tapping a beat to see it
-            react in real time (real lib/safety zones, seatbelt alert level, and near-miss trigger, not a canned
-            screenshot).
-          </Text>
-          <View style={styles.beatButtons}>
-            {DEMO_BEAT_ORDER.map((b) => (
-              <Pressable
-                key={b}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setBeat(b);
-                }}
-                style={[
-                  styles.beatButton,
-                  {
-                    backgroundColor: b === activeBeat ? colors.accent : colors.surfaceRaised,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={[type.bodyStrong, { color: b === activeBeat ? colors.accentOn : colors.textPrimary }]}
-                  numberOfLines={2}
-                >
-                  {DEMO_BEAT_LABEL[b]}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <PrimaryButton
-            label="Open Supervisor View"
-            onPress={() => router.push("/supervisor")}
-            variant="secondary"
-            fullWidth={false}
-          />
-
-          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Narrative script</Text>
-          <View style={styles.beatsList}>
-            {NARRATIVE_BEATS.map((beat, i) => (
-              <View key={beat} style={styles.beatRow}>
-                <Text style={[type.caption, { color: colors.textMuted }]}>{i + 1}</Text>
-                <Text style={[type.body, { color: colors.textPrimary, flex: 1 }]}>{beat}</Text>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </ScreenBackground>
+        }
+      />
+    </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  content: {
-    padding: spacing.md,
-    paddingBottom: spacing.xxl,
-    gap: spacing.md,
-  },
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   beatsList: {
-    gap: spacing.sm,
+    gap: spacing.sm + 2,
   },
   beatRow: {
     flexDirection: "row",
-    gap: spacing.sm,
+    gap: spacing.sm + 2,
     alignItems: "flex-start",
+  },
+  stepNum: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
   },
   beatButtons: {
     flexDirection: "row",
@@ -150,14 +168,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   beatButton: {
-    minWidth: "47%",
+    minWidth: "30%",
     minHeight: touchTarget,
     flexGrow: 1,
     borderWidth: 1,
-    borderRadius: radius.md,
-    alignItems: "center",
+    borderRadius: radius.sm,
     justifyContent: "center",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    gap: 3,
+    paddingHorizontal: spacing.md - 4,
+    paddingVertical: spacing.sm,
   },
 });

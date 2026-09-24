@@ -1,15 +1,15 @@
 import { useState } from "react";
 import * as Haptics from "expo-haptics";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { router } from "expo-router";
 
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
-import { CheckIcon } from "../components/icons";
+import { ArrowRightIcon, BookIcon, CheckIcon, ClockIcon, MonitorIcon, TrendIcon, UserIcon } from "../components/icons";
+import { InsightCard } from "../components/InsightCard";
+import { CardHeader, Columns, Grid, IconTile, Page, SectionTitle } from "../components/Page";
 import { PrimaryButton } from "../components/PrimaryButton";
-import { ScreenBackground } from "../components/ScreenBackground";
 import {
   beginnerPath,
   trainingLibrary,
@@ -21,7 +21,7 @@ import { useAuthStore } from "../store/auth";
 import { useLanguageStore } from "../store/language";
 import { formatPracticeDuration, totalPracticeSeconds, useTrainingProgressStore } from "../store/trainingProgress";
 import { useColors } from "../theme/useColors";
-import { radius, spacing, touchTarget, type } from "../theme/tokens";
+import { radius, spacing, type } from "../theme/tokens";
 
 const categoryTone: Record<LessonCategory, "safe" | "caution" | "danger" | "info" | "neutral"> = {
   safety: "danger",
@@ -106,159 +106,193 @@ export function TrainingScreen() {
     }
   }
 
+  const featured = scenarios.find((sc) => sc.id === "NearMissReplay") ?? scenarios[0];
+  const otherScenarios = scenarios.filter((sc) => sc.id !== featured.id);
+  const lessonPct = trainingLibrary.length ? completedLessonIds.size / trainingLibrary.length : 0;
+
+  const toggleLesson = (lesson: Lesson) =>
+    completedLessonIds.has(lesson.id) ? markLessonIncomplete(lesson.id) : markLessonComplete(lesson.id);
+
   return (
-    <ScreenBackground>
-      <SafeAreaView style={styles.screen} edges={["top"]}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={[type.label, { color: colors.textMuted }]}>TRAINING</Text>
-          <Text style={[type.display, { color: colors.textPrimary }]}>Practice &amp; learn</Text>
-          <Text style={[type.body, { color: colors.textMuted }]}>
-            Simulator scenarios and lessons, downloadable for offline use.
-          </Text>
-
-          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Your progress</Text>
-          <Card>
-            <View style={styles.progressGrid}>
-              <ProgressStat
-                label="Lessons completed"
-                value={`${completedLessonIds.size}/${trainingLibrary.length}`}
-                colors={colors}
+    <Page
+      eyebrow="Keep learning"
+      title="Safety training"
+      subtitle="Simulator scenarios and lessons, downloadable for offline use."
+      status={completedLessonIds.size > 0 ? { label: "Learning on track", tone: "safe" } : { label: "Get started", tone: "caution" }}
+    >
+      <Columns
+        sideWidth={340}
+        main={
+          <>
+            <Animated.View entering={FadeInDown.duration(400)}>
+              <InsightCard
+                eyebrow="Featured exercise"
+                headline={featured.title}
+                body={featured.description}
+                actionLabel="Start replay"
+                onPress={() => router.push({ pathname: "/simulator", params: { scenario: featured.id } })}
               />
-              <ProgressStat label="Practice sessions" value={String(sessions.length)} colors={colors} />
-              <ProgressStat
-                label="Practice time"
-                value={sessions.length ? formatPracticeDuration(totalPracticeSeconds(sessions)) : "—"}
-                colors={colors}
-              />
-              <ProgressStat
-                label="Best skill factor"
-                value={bestSkillFactor !== null ? bestSkillFactor.toFixed(2) : "—"}
-                colors={colors}
-              />
-            </View>
-          </Card>
+            </Animated.View>
 
-          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Practice scenarios</Text>
-          <View style={styles.scenarioList}>
-            {scenarios.map((s, i) => (
-              <Animated.View key={s.id} entering={FadeInDown.delay(120 + i * 70).duration(400)}>
-                <Card accentColor={s.tag === "Recommended" ? colors.accent : undefined}>
-                  <View style={styles.rowBetween}>
-                    <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>{s.title}</Text>
-                    <Badge label={s.tag} tone={s.tag === "New from today" ? "danger" : "neutral"} />
-                  </View>
-                  <Text style={[type.body, { color: colors.textMuted }]}>{s.description}</Text>
-                  <PrimaryButton
-                    label="Run scenario"
-                    onPress={() => router.push({ pathname: "/simulator", params: { scenario: s.id } })}
-                    variant={s.tag === "Recommended" ? "accent" : "secondary"}
-                    fullWidth={false}
-                  />
-                </Card>
-              </Animated.View>
-            ))}
-          </View>
-
-          <View style={[styles.rowBetween, { marginTop: spacing.sm }]}>
-            <Text style={[type.h2, { color: colors.textPrimary }]}>New operator pathway</Text>
-            <Text style={[type.caption, { color: colors.textMuted }]}>
-              {firstWeekPath.length} lessons · first week
-            </Text>
-          </View>
-          <Card accentColor={colors.info}>
-            <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>Learn before independent operation</Text>
-            <Text style={[type.body, { color: colors.textMuted }]}>
-              Complete this guided path with your trainer. The machine manual and site procedure always come first.
-            </Text>
-          </Card>
-          <View style={styles.scenarioList}>
-            {firstWeekPath.map((lesson, i) => (
-              <Animated.View key={lesson.id} entering={FadeInDown.delay(420 + i * 60).duration(400)}>
-                <LessonRow
-                  lesson={lesson}
-                  colors={colors}
-                  completed={completedLessonIds.has(lesson.id)}
-                  onToggleComplete={() =>
-                    completedLessonIds.has(lesson.id) ? markLessonIncomplete(lesson.id) : markLessonComplete(lesson.id)
-                  }
-                />
-              </Animated.View>
-            ))}
-          </View>
-          <PrimaryButton
-            label={showRefreshers ? "Hide practice and refresher lessons" : `Show ${trainingLibrary.length - firstWeekPath.length} more lessons`}
-            onPress={() => setShowRefreshers((shown) => !shown)}
-            variant="secondary"
-            fullWidth={false}
-          />
-          {showRefreshers ? (
-            <View style={styles.scenarioList}>
-              {trainingLibrary
-                .filter((lesson) => !firstWeekPath.some((starter) => starter.id === lesson.id))
-                .map((lesson, i) => (
-                  <Animated.View key={lesson.id} entering={FadeInDown.delay(i * 60).duration(350)}>
-                    <LessonRow
-                      lesson={lesson}
-                      colors={colors}
-                      completed={completedLessonIds.has(lesson.id)}
-                      onToggleComplete={() =>
-                        completedLessonIds.has(lesson.id) ? markLessonIncomplete(lesson.id) : markLessonComplete(lesson.id)
-                      }
+            <SectionTitle title="Practice scenarios" right={`${scenarios.length} in the simulator`} />
+            <Grid cols={2}>
+              {otherScenarios.map((sc, i) => (
+                <Animated.View key={sc.id} entering={FadeInDown.delay(80 + i * 60).duration(400)} style={styles.fill}>
+                  <Card style={styles.fill}>
+                    <View style={styles.rowBetween}>
+                      <IconTile bg={sc.tag === "Recommended" ? colors.accentSoft : colors.surfaceRaised}>
+                        <MonitorIcon color={colors.textPrimary} size={17} />
+                      </IconTile>
+                      {sc.tag === "Recommended" ? (
+                        <Badge label={sc.tag} tone="safe" />
+                      ) : (
+                        <Text style={[type.small, { color: colors.textMuted }]}>{sc.tag}</Text>
+                      )}
+                    </View>
+                    <Text style={[type.label, { color: colors.textMuted, fontSize: 10 }]}>SIMULATOR</Text>
+                    <Text style={[type.bodyStrong, { color: colors.textPrimary, marginTop: -4 }]}>{sc.title}</Text>
+                    <Text style={[type.small, { color: colors.textSecondary, lineHeight: 18, flex: 1 }]}>{sc.description}</Text>
+                    <PrimaryButton
+                      label="Run scenario"
+                      onPress={() => router.push({ pathname: "/simulator", params: { scenario: sc.id } })}
+                      variant={sc.tag === "Recommended" ? "primary" : "secondary"}
+                      iconRight
+            icon={<ArrowRightIcon color={sc.tag === "Recommended" ? colors.accentOn : colors.textPrimary} size={14} />}
                     />
-                  </Animated.View>
-                ))}
-            </View>
-          ) : null}
+                  </Card>
+                </Animated.View>
+              ))}
+            </Grid>
 
-          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Book an instructor</Text>
-          <Card>
-            {booking.status === "done" ? (
-              <>
-                <View style={styles.rowBetween}>
-                  <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>Booking requested</Text>
-                  <Badge label={booking.result.status} tone="info" />
+            <SectionTitle title="New operator pathway" right={`${firstWeekPath.length} lessons · first week`} />
+            <View style={[styles.callout, { backgroundColor: colors.infoSoft, borderColor: `${colors.info}40` }]}>
+              <BookIcon color={colors.info} size={17} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={[type.caption, { color: colors.textPrimary, fontFamily: "Inter_700Bold" }]}>
+                  Learn before independent operation
+                </Text>
+                <Text style={[type.small, { color: colors.textSecondary, lineHeight: 18 }]}>
+                  Complete this guided path with your trainer. The machine manual and site procedure always come first.
+                </Text>
+              </View>
+            </View>
+            <Grid cols={2}>
+              {firstWeekPath.map((lesson, i) => (
+                <Animated.View key={lesson.id} entering={FadeInDown.delay(200 + i * 50).duration(400)} style={styles.fill}>
+                  <LessonRow
+                    lesson={lesson}
+                    colors={colors}
+                    completed={completedLessonIds.has(lesson.id)}
+                    onToggleComplete={() => toggleLesson(lesson)}
+                  />
+                </Animated.View>
+              ))}
+            </Grid>
+            <PrimaryButton
+              label={showRefreshers ? "Hide practice and refresher lessons" : `Show ${trainingLibrary.length - firstWeekPath.length} more lessons`}
+              onPress={() => setShowRefreshers((shown) => !shown)}
+              variant="secondary"
+              fullWidth={false}
+            />
+            {showRefreshers ? (
+              <Grid cols={2}>
+                {trainingLibrary
+                  .filter((lesson) => !firstWeekPath.some((starter) => starter.id === lesson.id))
+                  .map((lesson, i) => (
+                    <Animated.View key={lesson.id} entering={FadeInDown.delay(i * 50).duration(350)} style={styles.fill}>
+                      <LessonRow
+                        lesson={lesson}
+                        colors={colors}
+                        completed={completedLessonIds.has(lesson.id)}
+                        onToggleComplete={() => toggleLesson(lesson)}
+                      />
+                    </Animated.View>
+                  ))}
+              </Grid>
+            ) : null}
+          </>
+        }
+        side={
+          <>
+            <Animated.View entering={FadeInDown.delay(60).duration(400)}>
+              <Card>
+                <CardHeader title="Your progress" right={<TrendIcon color={colors.safe} size={18} />} />
+                <View style={styles.progressGrid}>
+                  <ProgressStat
+                    label="Lessons completed"
+                    value={`${completedLessonIds.size}/${trainingLibrary.length}`}
+                    colors={colors}
+                  />
+                  <ProgressStat label="Practice sessions" value={String(sessions.length)} colors={colors} />
+                  <ProgressStat
+                    label="Practice time"
+                    value={sessions.length ? formatPracticeDuration(totalPracticeSeconds(sessions)) : "—"}
+                    colors={colors}
+                  />
+                  <ProgressStat
+                    label="Best skill factor"
+                    value={bestSkillFactor !== null ? bestSkillFactor.toFixed(2) : "—"}
+                    colors={colors}
+                  />
                 </View>
-                <Text style={[type.body, { color: colors.textMuted }]}>{booking.result.reply}</Text>
-                <Text style={[type.caption, { color: colors.textMuted }]}>
-                  {new Date(booking.result.slot_start).toLocaleString()} –{" "}
-                  {new Date(booking.result.slot_end).toLocaleTimeString()}
-                </Text>
-                <PrimaryButton
-                  label="Request another slot"
-                  onPress={requestBooking}
-                  variant="secondary"
-                  fullWidth={false}
-                />
-              </>
-            ) : (
-              <>
-                <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>Request a slot</Text>
-                <Text style={[type.caption, { color: colors.textMuted }]}>
-                  Books the next available instructor slot — needs a connection, same as the assistant&apos;s booking.
-                </Text>
-                {booking.status === "error" ? (
-                  <Text style={[type.caption, { color: colors.danger }]}>{booking.message}</Text>
-                ) : null}
-                <PrimaryButton
-                  label={booking.status === "loading" ? "Requesting…" : "Request booking"}
-                  onPress={requestBooking}
-                  variant="secondary"
-                  fullWidth={false}
-                />
-              </>
-            )}
-          </Card>
-        </ScrollView>
-      </SafeAreaView>
-    </ScreenBackground>
+                <View style={[styles.footerRow, { borderTopColor: colors.border }]}>
+                  <Text style={[type.small, { color: colors.textSecondary }]}>Library progress</Text>
+                  <Text style={[type.small, { color: colors.safe, fontFamily: "Inter_700Bold" }]}>{Math.round(lessonPct * 100)}%</Text>
+                </View>
+                <View style={[styles.track, { backgroundColor: colors.surfaceRaised }]}>
+                  <View style={[styles.trackFill, { width: `${lessonPct * 100}%`, backgroundColor: colors.safe }]} />
+                </View>
+              </Card>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(120).duration(400)}>
+              <Card>
+                <CardHeader eyebrow="One-to-one" title="Book an instructor" right={<UserIcon color={colors.textSecondary} size={18} />} />
+                {booking.status === "done" ? (
+                  <>
+                    <View style={styles.rowBetween}>
+                      <Text style={[type.caption, { color: colors.textPrimary, fontFamily: "Inter_700Bold" }]}>Booking requested</Text>
+                      <Badge label={booking.result.status} tone="info" />
+                    </View>
+                    <Text style={[type.small, { color: colors.textSecondary, lineHeight: 18 }]}>{booking.result.reply}</Text>
+                    <View style={[styles.slot, { backgroundColor: colors.surfaceSunken, borderColor: colors.border }]}>
+                      <ClockIcon color={colors.textSecondary} size={14} />
+                      <Text style={[type.small, { color: colors.textPrimary }]}>
+                        {new Date(booking.result.slot_start).toLocaleString()} –{" "}
+                        {new Date(booking.result.slot_end).toLocaleTimeString()}
+                      </Text>
+                    </View>
+                    <PrimaryButton label="Request another slot" onPress={requestBooking} variant="secondary" />
+                  </>
+                ) : (
+                  <>
+                    <Text style={[type.small, { color: colors.textSecondary, lineHeight: 18 }]}>
+                      Books the next available instructor slot — needs a connection, same as the assistant&apos;s booking.
+                    </Text>
+                    {booking.status === "error" ? (
+                      <Text style={[type.small, { color: colors.danger }]}>{booking.message}</Text>
+                    ) : null}
+                    <PrimaryButton
+                      label={booking.status === "loading" ? "Requesting…" : "Request booking"}
+                      onPress={requestBooking}
+                      variant="primary"
+                    />
+                  </>
+                )}
+              </Card>
+            </Animated.View>
+          </>
+        }
+      />
+    </Page>
   );
 }
 
 function ProgressStat({ label, value, colors }: { label: string; value: string; colors: ReturnType<typeof useColors> }) {
   return (
     <View style={styles.progressCell}>
-      <Text style={[type.h2, { color: colors.textPrimary }]}>{value}</Text>
-      <Text style={[type.caption, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[type.metric, { color: colors.textPrimary, fontSize: 22 }]}>{value}</Text>
+      <Text style={[type.small, { color: colors.textMuted }]}>{label}</Text>
     </View>
   );
 }
@@ -275,38 +309,54 @@ function LessonRow({
   onToggleComplete: () => void;
 }) {
   return (
-    <Card accentColor={completed ? colors.safe : undefined}>
+    <Card style={styles.fill}>
       <Pressable
         onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: lesson.id } })}
-        style={{ gap: spacing.sm }}
+        style={{ gap: spacing.sm, flex: 1 }}
       >
         <View style={styles.rowBetween}>
-          <Text style={[type.bodyStrong, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
-            {lesson.title}
-          </Text>
-          <Badge label={lesson.category} tone={categoryTone[lesson.category]} />
+          <IconTile bg={colors.surfaceRaised}>
+            <BookIcon color={colors.textPrimary} size={17} />
+          </IconTile>
+          {completed ? (
+            <Badge label="Complete" tone="safe" />
+          ) : (
+            <Text style={[type.small, { color: colors.textMuted }]}>{lesson.videoUri ? "Video" : "Text lesson"}</Text>
+          )}
         </View>
-        <Text style={[type.body, { color: colors.textMuted }]} numberOfLines={2}>
-          {lesson.summary}
+        <Text style={[type.label, { color: colors.textMuted, fontSize: 10 }]}>{lesson.category.toUpperCase()}</Text>
+        <Text style={[type.bodyStrong, { color: colors.textPrimary, marginTop: -4 }]} numberOfLines={2}>
+          {lesson.title}
         </Text>
-        <View style={styles.objectiveBox}>
-          <Text style={[type.caption, { color: colors.textMuted }]}>YOU WILL LEARN</Text>
-          <Text style={[type.caption, { color: colors.textPrimary }]}>{lesson.objective}</Text>
-        </View>
-        <Text style={[type.caption, { color: colors.textMuted }]} numberOfLines={2}>
-          Key steps: {lesson.keySteps.slice(0, 2).join(" · ")}
-        </Text>
-        <View style={styles.rowBetween}>
-          <Text style={[type.caption, { color: colors.textMuted }]}>
+        <View style={styles.metaRow}>
+          <ClockIcon color={colors.textMuted} size={12} />
+          <Text style={[type.small, { color: colors.textMuted }]}>
             {lesson.durationMin} min · {lesson.languages.join("/")}
             {lesson.standardRef ? ` · ${lesson.standardRef}` : ""}
           </Text>
-          <View style={styles.rowBetween}>
-            {/* A handful of lessons now have a real embedded video (see
-                trainingLibrary.ts) — this reflects which, honestly, per lesson. */}
-            <Badge label={lesson.videoUri ? "Video" : "Text lesson"} tone="neutral" />
-            {lesson.downloadedOffline ? <Badge label="Downloaded" tone="safe" /> : null}
-          </View>
+        </View>
+        <Text style={[type.small, { color: colors.textSecondary, lineHeight: 18 }]} numberOfLines={2}>
+          {lesson.summary}
+        </Text>
+        <View style={[styles.objectiveBox, { backgroundColor: colors.surfaceSunken }]}>
+          <Text style={[type.label, { color: colors.textMuted, fontSize: 9.5 }]}>YOU WILL LEARN</Text>
+          <Text style={[type.small, { color: colors.textPrimary }]}>{lesson.objective}</Text>
+        </View>
+        <Text style={[type.small, { color: colors.textMuted }]} numberOfLines={2}>
+          Key steps: {lesson.keySteps.slice(0, 2).join(" · ")}
+        </Text>
+        <View style={styles.badgeRow}>
+          {/* A handful of lessons now have a real embedded video (see
+              trainingLibrary.ts) — this reflects which, honestly, per lesson. */}
+          <Badge label={lesson.category} tone={categoryTone[lesson.category]} />
+          {lesson.downloadedOffline ? <Badge label="Downloaded" tone="safe" /> : null}
+        </View>
+        <View style={styles.rowBetween}>
+          <Text style={[type.small, { color: colors.textSecondary }]}>Progress</Text>
+          <Text style={[type.small, { color: colors.textPrimary, fontFamily: "Inter_700Bold" }]}>{completed ? "100%" : "0%"}</Text>
+        </View>
+        <View style={[styles.track, { backgroundColor: colors.surfaceRaised }]}>
+          <View style={[styles.trackFill, { width: completed ? "100%" : "0%", backgroundColor: colors.safe }]} />
         </View>
       </Pressable>
       <Pressable
@@ -314,20 +364,16 @@ function LessonRow({
           Haptics.selectionAsync();
           onToggleComplete();
         }}
-        style={[
+        style={({ hovered }) => [
           styles.completeRow,
-          { borderColor: completed ? colors.safe : colors.border, backgroundColor: completed ? `${colors.safe}17` : "transparent" },
+          {
+            borderColor: completed ? colors.border : colors.borderStrong,
+            backgroundColor: completed ? colors.surfaceSunken : hovered ? colors.surfaceRaised : colors.surface,
+          },
         ]}
       >
-        <View
-          style={[
-            styles.completeCheckbox,
-            { borderColor: completed ? colors.safe : colors.border, backgroundColor: completed ? colors.safe : "transparent" },
-          ]}
-        >
-          {completed ? <CheckIcon color={colors.mode === "light" ? "#FFFFFF" : colors.bg} size={14} /> : null}
-        </View>
-        <Text style={[type.caption, { color: completed ? colors.safe : colors.textSecondary, fontWeight: "700" }]}>
+        {completed ? <CheckIcon color={colors.textMuted} size={14} /> : null}
+        <Text style={[type.small, { color: completed ? colors.textMuted : colors.textPrimary, fontFamily: "Inter_600SemiBold" }]}>
           {completed ? "Completed" : "Mark as complete"}
         </Text>
       </Pressable>
@@ -336,13 +382,8 @@ function LessonRow({
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  fill: {
     flex: 1,
-  },
-  content: {
-    padding: spacing.md,
-    paddingBottom: spacing.xxl + 72,
-    gap: spacing.md,
   },
   rowBetween: {
     flexDirection: "row",
@@ -350,37 +391,71 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm,
   },
-  scenarioList: {
-    gap: spacing.sm,
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
   },
   objectiveBox: {
-    gap: 2,
+    gap: 3,
+    borderRadius: radius.sm,
+    padding: spacing.sm + 2,
+  },
+  callout: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm + 2,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
   },
   progressGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.md,
+    rowGap: spacing.md,
+    marginTop: spacing.xs,
   },
   progressCell: {
-    minWidth: "40%",
-    flexGrow: 1,
+    width: "50%",
     gap: 2,
+  },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    paddingTop: spacing.sm + 4,
+    marginTop: spacing.xs,
+  },
+  track: {
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  trackFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  slot: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    padding: spacing.sm + 2,
   },
   completeRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
-    minHeight: touchTarget,
-    borderRadius: radius.md,
+    minHeight: 42,
+    borderRadius: radius.sm,
     borderWidth: 1,
     paddingHorizontal: spacing.sm,
-  },
-  completeCheckbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

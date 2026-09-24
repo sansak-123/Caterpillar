@@ -3,8 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { useColors } from "../theme/useColors";
 import { radius, spacing } from "../theme/tokens";
 
-// Active tab gets a solid rounded-pill fill behind the icon (matching the reference
-// design's active-tab treatment) instead of just a color change.
+// Active tab gets the same pale-yellow highlight the sidebar uses for its active item.
 export function TabIcon({
   focused,
   children,
@@ -14,9 +13,7 @@ export function TabIcon({
 }) {
   const colors = useColors();
   if (!focused) return <View style={styles.wrap}>{children}</View>;
-  return (
-    <View style={[styles.wrap, styles.pill, { backgroundColor: colors.primaryDark }]}>{children}</View>
-  );
+  return <View style={[styles.wrap, styles.pill, { backgroundColor: colors.navActive }]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -25,9 +22,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pill: {
-    width: 44,
-    height: 32,
-    borderRadius: radius.pill,
+    width: 48,
+    height: 30,
+    borderRadius: radius.md,
     marginBottom: -spacing.xs,
   },
 });

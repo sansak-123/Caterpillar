@@ -22,7 +22,7 @@ export function LanguageSwitcher() {
   const setLanguage = useLanguageStore((s) => s.setLanguage);
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {LANGUAGES.map((l) => (
         <Pressable
           key={l.code}
@@ -34,14 +34,11 @@ export function LanguageSwitcher() {
           }}
           style={[
             styles.chip,
-            {
-              backgroundColor: l.code === language ? colors.accent : colors.surfaceRaised,
-              borderColor: colors.border,
-            },
+            { backgroundColor: l.code === language ? colors.accent : "transparent" },
           ]}
         >
           <Text
-            style={[type.caption, { color: l.code === language ? colors.accentOn : colors.textSecondary, fontWeight: "700" }]}
+            style={[type.small, { color: l.code === language ? colors.accentOn : colors.textSecondary, fontFamily: "Inter_700Bold" }]}
           >
             {l.label}
           </Text>
@@ -54,13 +51,15 @@ export function LanguageSwitcher() {
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
-    gap: 4,
+    gap: 2,
+    padding: 2,
+    borderWidth: 1,
+    borderRadius: radius.sm,
   },
   chip: {
-    minWidth: 32,
+    minWidth: 30,
     minHeight: 28,
-    borderRadius: radius.pill,
-    borderWidth: 1,
+    borderRadius: radius.sm - 2,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.xs,
