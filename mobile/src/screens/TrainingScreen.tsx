@@ -268,34 +268,39 @@ function LessonRow({
 }) {
   return (
     <Card accentColor={completed ? colors.safe : undefined}>
-      <View style={styles.rowBetween}>
-        <Text style={[type.bodyStrong, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
-          {lesson.title}
+      <Pressable
+        onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: lesson.id } })}
+        style={{ gap: spacing.sm }}
+      >
+        <View style={styles.rowBetween}>
+          <Text style={[type.bodyStrong, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
+            {lesson.title}
+          </Text>
+          <Badge label={lesson.category} tone={categoryTone[lesson.category]} />
+        </View>
+        <Text style={[type.body, { color: colors.textMuted }]} numberOfLines={2}>
+          {lesson.summary}
         </Text>
-        <Badge label={lesson.category} tone={categoryTone[lesson.category]} />
-      </View>
-      <Text style={[type.body, { color: colors.textMuted }]} numberOfLines={2}>
-        {lesson.summary}
-      </Text>
-      <View style={styles.objectiveBox}>
-        <Text style={[type.caption, { color: colors.textMuted }]}>YOU WILL LEARN</Text>
-        <Text style={[type.caption, { color: colors.textPrimary }]}>{lesson.objective}</Text>
-      </View>
-      <Text style={[type.caption, { color: colors.textMuted }]} numberOfLines={2}>
-        Key steps: {lesson.keySteps.slice(0, 2).join(" · ")}
-      </Text>
-      <View style={styles.rowBetween}>
-        <Text style={[type.caption, { color: colors.textMuted }]}>
-          {lesson.durationMin} min · {lesson.languages.join("/")}
-          {lesson.standardRef ? ` · ${lesson.standardRef}` : ""}
+        <View style={styles.objectiveBox}>
+          <Text style={[type.caption, { color: colors.textMuted }]}>YOU WILL LEARN</Text>
+          <Text style={[type.caption, { color: colors.textPrimary }]}>{lesson.objective}</Text>
+        </View>
+        <Text style={[type.caption, { color: colors.textMuted }]} numberOfLines={2}>
+          Key steps: {lesson.keySteps.slice(0, 2).join(" · ")}
         </Text>
         <View style={styles.rowBetween}>
-          {/* Every lesson today is text-based (no video files exist yet) — this says so
-              rather than leaving the operator wondering why nothing plays. */}
-          <Badge label={lesson.videoUri ? "Video" : "Text lesson"} tone="neutral" />
-          {lesson.downloadedOffline ? <Badge label="Downloaded" tone="safe" /> : null}
+          <Text style={[type.caption, { color: colors.textMuted }]}>
+            {lesson.durationMin} min · {lesson.languages.join("/")}
+            {lesson.standardRef ? ` · ${lesson.standardRef}` : ""}
+          </Text>
+          <View style={styles.rowBetween}>
+            {/* A handful of lessons now have a real embedded video (see
+                trainingLibrary.ts) — this reflects which, honestly, per lesson. */}
+            <Badge label={lesson.videoUri ? "Video" : "Text lesson"} tone="neutral" />
+            {lesson.downloadedOffline ? <Badge label="Downloaded" tone="safe" /> : null}
+          </View>
         </View>
-      </View>
+      </Pressable>
       <Pressable
         onPress={() => {
           Haptics.selectionAsync();

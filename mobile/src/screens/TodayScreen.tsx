@@ -263,7 +263,6 @@ export function TodayScreen() {
   const devNetworkCut = useConnectivityStore((s) => s.devNetworkCut);
   const token = useAuthStore((s) => s.token);
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
-  const [isLive, setIsLive] = useState(false);
   const [offlineEstimates, setOfflineEstimates] = useState<Record<string, { p50: number; p90: number }>>({});
 
   // Session bootstrap and connectivity status/queued-count are owned by the root
@@ -278,7 +277,6 @@ export function TodayScreen() {
         const apiTasks = await fetchTasksToday(token);
         if (cancelled) return;
         setTasks(apiTasks.map(mapApiTask));
-        setIsLive(true);
       } catch {
         // Backend reachable enough for a token but not for this call — keep whatever
         // was already showing (demo data or the last successful live fetch).
@@ -394,8 +392,7 @@ export function TodayScreen() {
               <View style={styles.progressText}>
                 <Text style={[type.h2, { color: colors.textPrimary }]}>OP1001 · EXC001</Text>
                 <Text style={[type.caption, { color: colors.textMuted }]}>
-                  {t("today.tasksScheduled", { count: tasks.length })} ·{" "}
-                  {isLive ? t("today.liveFromBackend") : t("today.demoData")} — {t("today.reorderAnytime")}
+                  {t("today.tasksScheduled", { count: tasks.length })} — {t("today.reorderAnytime")}
                 </Text>
               </View>
             </Card>
