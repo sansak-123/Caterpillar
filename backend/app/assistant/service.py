@@ -27,10 +27,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser
+from app.assistant.gemini_client import generate_gemini_text
 from app.assistant.intents import Intent, language_name, match_intent
 from app.assistant.openrouter_client import get_openrouter_client
 from app.core.config import get_settings
-from app.models import Alert, Booking, Incident, Machine, Operator, Task
+from app.models import Alert, Booking, Incident, Machine, Operator, Site, Task, TelemetryMinute
 from app.schemas.assistant import (
     AssistantAction,
     AssistantChatRequest,
@@ -64,6 +65,47 @@ async def _with_retry(call: Callable[[], Awaitable[_T]], *, label: str, attempts
                 await asyncio.sleep(0.5)
     assert last_exc is not None
     raise last_exc
+
+
+def _has_llm_key() -> bool:
+    settings = get_settings()
+    return bool(settings.gemini_api_key or settings.openrouter_api_key)
+
+
+async def _generate_llm(
+    *, system: str, prompt: str, max_tokens: int, temperature: float, json_output: bool = False
+) -> str:
+    """Use direct Gemini when configured, otherwise preserve the OpenRouter fallback."""
+    settings = get_settings()
+    if settings.gemini_api_key:
+        return await _with_retry(
+            lambda: generate_gemini_text(
+                system=system,
+                prompt=prompt,
+                max_output_tokens=max_tokens,
+                temperature=temperature,
+                json_output=json_output,
+            ),
+            label="Gemini",
+        )
+    if not _has_llm_key():
+        raise RuntimeError("No LLM API key configured")
+
+    client = get_openrouter_client()
+    response = await _with_retry(
+        lambda: client.chat.completions.create(
+            model=settings.assistant_strong_model if json_output else settings.assistant_fast_model,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+            temperature=temperature,
+            response_format={"type": "json_object"} if json_output else None,
+        ),
+        label="OpenRouter",
+    )
+    text = (response.choices[0].message.content or "").strip()
+    if not text:
+        raise ValueError("OpenRouter returned an empty completion")
+    return text
 
 _SAFETY_KB: tuple[tuple[str, str], ...] = (
     (
@@ -131,9 +173,32 @@ async def _maybe_llm_phrase(language: str, grounded_text: str) -> tuple[str, str
     text unchanged (source="grounded") the moment anything about the call isn't clean —
     missing key, network error, empty completion — rather than ever raising."""
     settings = get_settings()
-    if not settings.openrouter_api_key:
+    if not _has_llm_key():
         return grounded_text, "grounded"
+    if settings.gemini_api_key:
+        try:
+            text = await _generate_llm(
+                system=(
+                    "Rephrase the following operator-facing message in "
+                    f"{language_name(language)}, keeping it to 1-2 short sentences a driver can "
+                    "glance at or hear read aloud. Keep every number and fact exactly as given."
+                ),
+                prompt=grounded_text,
+                max_tokens=200,
+                temperature=0.3,
+            )
+            return text, "llm"
+        except Exception:
+            return grounded_text, "grounded"
     try:
+        if settings.gemini_api_key:
+            text = await _generate_llm(
+                system=_chat_system_prompt(language, kb_hit),
+                prompt=body.message,
+                max_tokens=220,
+                temperature=0.4,
+            )
+            return AssistantChatResponse(reply=text, intent=intent, language=language, source="llm")
         client = get_openrouter_client()
         response = await _with_retry(
             lambda: client.chat.completions.create(
@@ -161,15 +226,91 @@ async def _maybe_llm_phrase(language: str, grounded_text: str) -> tuple[str, str
         return grounded_text, "grounded"
 
 
-def _chat_system_prompt(language: str, kb_hit: str | None) -> str:
+def _chat_system_prompt(language: str, kb_hit: str | None, operator_context: str | None = None) -> str:
     grounding = f" Relevant fact you must stay consistent with: {kb_hit}" if kb_hit else ""
+    context = (
+        f" Operator context for this signed-in user: {operator_context}"
+        if operator_context
+        else " No operator context is currently available. Do not invent it."
+    )
     return (
         "You are the OperatorOS in-cab voice/text assistant for a CAT excavator or "
         f"loader operator. Reply in {language_name(language)}, in at most 2 short "
         "sentences suitable for glancing at a screen or hearing read aloud. Never invent "
         "specific numbers, thresholds, or machine data you weren't given. This product's "
         "safety and idle features are designed to protect and never police the "
-        "operator — answer in that spirit." + grounding
+        "operator — answer in that spirit. If asked for exact GPS and it is not present, "
+        "say that only the assigned site location is available." + grounding + context
+    )
+
+
+async def _operator_context(session: AsyncSession, user: CurrentUser) -> str | None:
+    """Build a small, private context snapshot for the signed-in operator."""
+    if not user.operator_id:
+        return None
+
+    operator = await session.get(Operator, user.operator_id)
+    if operator is None:
+        return None
+
+    tasks = list(
+        await session.scalars(
+            select(Task)
+            .where(Task.operator_id == user.operator_id, Task.scheduled_date == dt.date.today())
+            .order_by(Task.status, Task.created_at)
+        )
+    )
+    task_lines: list[str] = []
+    site_ids = {task.site_id for task in tasks}
+    sites = {
+        site.site_id: site
+        for site in await session.scalars(select(Site).where(Site.site_id.in_(site_ids)))
+    }
+    for task in tasks[:5]:
+        site = sites.get(task.site_id)
+        site_text = f"site {site.name} ({site.lat}, {site.lon})" if site else f"site {task.site_id}"
+        task_lines.append(
+            f"{task.task_id} {task.task_type}, {task.status}, estimate {task.est_min:g} min, {site_text}"
+        )
+
+    latest = await session.scalar(
+        select(TelemetryMinute)
+        .where(TelemetryMinute.operator_id == user.operator_id)
+        .order_by(TelemetryMinute.ts.desc())
+        .limit(1)
+    )
+    telemetry_text = "no recent telemetry"
+    if latest is not None:
+        telemetry_text = (
+            f"machine {latest.machine_id}, state {latest.state}, seatbelt {latest.seatbelt}, "
+            f"travel {latest.travel_kmh:g} km/h, swing {latest.swing_rate_dps:g} dps, "
+            f"zone {latest.zone or 'unknown'}, nearest person "
+            f"{latest.nearest_person_m if latest.nearest_person_m is not None else 'unknown'} m"
+        )
+
+    alerts = list(
+        await session.scalars(
+            select(Alert)
+            .where(Alert.operator_id == user.operator_id)
+            .order_by(Alert.ts.desc())
+            .limit(3)
+        )
+    )
+    incidents = list(
+        await session.scalars(
+            select(Incident)
+            .where(Incident.operator_id == user.operator_id)
+            .order_by(Incident.ts.desc())
+            .limit(3)
+        )
+    )
+    alert_text = ", ".join(f"{item.type}/{item.severity}" for item in alerts) or "none"
+    incident_text = ", ".join(f"{item.type}/{item.severity}" for item in incidents) or "none"
+    tasks_text = "; ".join(task_lines) or "none scheduled today"
+    return (
+        f"operator {operator.operator_id}, skill {operator.skill}, shift {operator.shift}; "
+        f"today's tasks: {tasks_text}; latest telemetry: {telemetry_text}; "
+        f"recent alerts: {alert_text}; recent incidents: {incident_text}"
     )
 
 
@@ -302,12 +443,17 @@ async def _why_flagged(
 
 
 async def _safety_or_general(
-    session: AsyncSession, language: str, body: AssistantChatRequest, intent: Intent
+    session: AsyncSession,
+    user: CurrentUser,
+    language: str,
+    body: AssistantChatRequest,
+    intent: Intent,
 ) -> AssistantChatResponse:
     settings = get_settings()
     kb_hit = _kb_lookup(body.message)
+    operator_context = await _operator_context(session, user)
 
-    if not settings.openrouter_api_key:
+    if not _has_llm_key():
         if kb_hit:
             reply, source = kb_hit, "grounded"
         else:
@@ -318,13 +464,29 @@ async def _safety_or_general(
             source = "degraded_no_key"
         return AssistantChatResponse(reply=reply, intent=intent, language=language, source=source)
 
+    if settings.gemini_api_key:
+        try:
+            text = await _generate_llm(
+                system=_chat_system_prompt(language, kb_hit, operator_context),
+                prompt=body.message,
+                max_tokens=220,
+                temperature=0.4,
+            )
+            return AssistantChatResponse(reply=text, intent=intent, language=language, source="llm")
+        except Exception as exc:
+            logger.warning("[assistant] Gemini gave up after retries: %r", exc)
+            if kb_hit:
+                return AssistantChatResponse(
+                    reply=kb_hit, intent=intent, language=language, source="grounded"
+                )
+
     try:
         client = get_openrouter_client()
         response = await _with_retry(
             lambda: client.chat.completions.create(
                 model=settings.assistant_fast_model,
                 messages=[
-                    {"role": "system", "content": _chat_system_prompt(language, kb_hit)},
+                    {"role": "system", "content": _chat_system_prompt(language, kb_hit, operator_context)},
                     {"role": "user", "content": body.message},
                 ],
                 max_tokens=220,
@@ -388,7 +550,7 @@ async def handle_chat(
             actions=[AssistantAction(type="open_booking")],
         )
 
-    return await _safety_or_general(session, language, body, intent)
+    return await _safety_or_general(session, user, language, body, intent)
 
 
 def _heuristic_structure_incident(transcript: str) -> dict:

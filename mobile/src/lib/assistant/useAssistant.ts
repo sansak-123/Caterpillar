@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   DEMO_MACHINE_ID,
@@ -49,6 +49,13 @@ export function useAssistant(language: AssistantLanguage) {
     { id: "greeting", role: "assistant", text: GREETING[language] },
   ]);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setMessages((previous) => {
+      if (previous.length !== 1 || previous[0]?.id !== "greeting") return previous;
+      return [{ id: "greeting", role: "assistant", text: GREETING[language] }];
+    });
+  }, [language]);
 
   const isOnline = !devNetworkCut && connectivity !== "offline";
 

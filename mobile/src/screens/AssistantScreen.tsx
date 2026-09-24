@@ -11,6 +11,7 @@ import { useVoiceInput, type AssistantLanguage } from "../lib/assistant/voice";
 import { useLanguageStore } from "../store/language";
 import { useColors } from "../theme/useColors";
 import { radius, spacing, touchTarget, type } from "../theme/tokens";
+import i18n from "../i18n";
 
 type QuickAction = { id: string; label: string };
 
@@ -37,6 +38,7 @@ export function AssistantScreen() {
   const pendingIncidentRef = useRef(false);
   const wasListeningRef = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
+  const t = i18n.t.bind(i18n);
 
   useEffect(() => {
     if (wasListeningRef.current && !voice.listening) {
@@ -103,8 +105,8 @@ export function AssistantScreen() {
 
   return (
     <Page
-      eyebrow="Assistant"
-      title="How can I help?"
+      eyebrow={t("assistant.eyebrow")}
+      title={t("assistant.title")}
       subtitle={
         isOnline
           ? "Online — answers use the OpenRouter assistant model, grounded in your real tasks and flags."
@@ -113,7 +115,7 @@ export function AssistantScreen() {
       scroll={false}
       right={
         <View style={styles.headerRight}>
-          <Badge label={isOnline ? "Online model" : "Offline KB"} tone={isOnline ? "safe" : "caution"} />
+          <Badge label={isOnline ? t("assistant.onlineModel") : t("assistant.offlineKb")} tone={isOnline ? "safe" : "caution"} />
           <View style={[styles.langRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {LANGUAGES.map((l) => (
               <Pressable
@@ -149,7 +151,7 @@ export function AssistantScreen() {
               ]}
             >
               <View style={[styles.tileIcon, { backgroundColor: colors.accentSoft }]}>{quickIcon[a.id]?.(colors.textPrimary)}</View>
-              <Text style={[type.caption, { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", flex: 1 }]}>{a.label}</Text>
+                <Text style={[type.caption, { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", flex: 1 }]}>{t(`assistant.actions.${a.id}`)}</Text>
               <ArrowRightIcon color={colors.textMuted} size={13} />
             </Pressable>
           </Animated.View>
@@ -159,7 +161,7 @@ export function AssistantScreen() {
       <View style={[styles.chatPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={[styles.chatHeader, { borderBottomColor: colors.border }]}>
           <ChatIcon color={colors.textSecondary} size={15} />
-          <Text style={[type.small, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>Conversation</Text>
+          <Text style={[type.small, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>{t("assistant.conversation")}</Text>
         </View>
         <ScrollView
           ref={scrollRef}
@@ -171,7 +173,7 @@ export function AssistantScreen() {
             <View style={styles.empty}>
               <BookIcon color={colors.textMuted} size={20} />
               <Text style={[type.small, { color: colors.textMuted, textAlign: "center" }]}>
-                Ask a question, tap a shortcut above, or use the mic to talk hands-free.
+                {t("assistant.empty")}
               </Text>
             </View>
           ) : null}
@@ -188,7 +190,7 @@ export function AssistantScreen() {
             onChangeText={setInput}
             onSubmitEditing={submitTyped}
             editable={!voice.listening}
-            placeholder="Type or hold to talk…"
+            placeholder={t("assistant.placeholder")}
             placeholderTextColor={colors.textMuted}
             style={[type.body, styles.textInput, { color: colors.textPrimary }]}
             returnKeyType="send"

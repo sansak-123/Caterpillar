@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # free catalog before deploying; free-tier model availability changes over time.
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    # Direct Gemini fallback/preferred provider. Keep this server-only: never prefix it
+    # with EXPO_PUBLIC_ or place it in the mobile app's environment.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
     # OpenRouter's free-tier catalog turns over — both defaults below were verified
     # live against https://openrouter.ai/api/v1/models on 2026-09-24; the previous
     # defaults (llama-3.1-8b-instruct:free, gemini-2.0-flash-exp:free) had been pulled
