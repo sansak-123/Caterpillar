@@ -3,6 +3,8 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import "../i18n"; // side-effect: initializes i18next once, before any screen renders translated text
+
 import { ensureDemoSession } from "../lib/api/client";
 import { useSyncEngine } from "../lib/sync/engine";
 import { useAuthStore } from "../store/auth";

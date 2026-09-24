@@ -30,7 +30,8 @@
       "expo-speech-recognition",
       "expo-sqlite",
       "expo-secure-store",
-      "onnxruntime-react-native"
+      "onnxruntime-react-native",
+      "expo-localization"
     ]
   }
 }
