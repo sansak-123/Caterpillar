@@ -1,6 +1,6 @@
 import { useState } from "react";
 import * as Haptics from "expo-haptics";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { router } from "expo-router";
@@ -8,6 +8,7 @@ import { router } from "expo-router";
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
 import { GlassCard } from "../components/GlassCard";
+import { TrainingIcon } from "../components/icons";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ProgressRing } from "../components/ProgressRing";
 import { ScreenBackground } from "../components/ScreenBackground";
@@ -106,9 +107,17 @@ export function TrainingScreen() {
           <Animated.View entering={FadeInDown.duration(400)}>
             <GlassCard glowColor={colors.accentGlow} style={styles.heroCard}>
               <View style={styles.heroTop}>
-                <View style={styles.heroPreview}>
-                  <Text style={[type.caption, { color: colors.textMuted }]}>Unity viewport</Text>
-                </View>
+                <Pressable
+                  style={[styles.heroPreview, { backgroundColor: colors.accent }]}
+                  onPress={() => router.push({ pathname: "/simulator", params: { scenario: "GhostOperator" } })}
+                  accessibilityRole="button"
+                  accessibilityLabel="Launch Ghost Operator"
+                >
+                  <View style={[styles.playCircle, { backgroundColor: colors.accentOn }]}>
+                    <TrainingIcon color={colors.accent} size={22} />
+                  </View>
+                  <Text style={[type.caption, { color: colors.accentOn, fontWeight: "700" }]}>Ghost Operator</Text>
+                </Pressable>
                 <ProgressRing
                   progress={0.82}
                   size={84}
@@ -288,7 +297,14 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 100,
     borderRadius: radius.md,
-    backgroundColor: "rgba(0,0,0,0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  playCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
