@@ -102,7 +102,7 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
       </View>
       {compact ? null : (
         <View>
-          <Text style={[styles.brandName, { color: colors.textPrimary }]}>CATERPILLAR</Text>
+          <Text style={[styles.brandName, { color: colors.textPrimary }]}>CATERA</Text>
           <Text style={[styles.brandSub, { color: colors.textSecondary }]}>OPERATOR SAFETY</Text>
         </View>
       )}
