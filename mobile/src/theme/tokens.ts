@@ -144,14 +144,18 @@ export const radius = {
   pill: 999,
 } as const;
 
+// Per-weight Inter family names (loaded via useFonts in app/_layout.tsx) rather than a
+// single family + numeric fontWeight — Android ignores fontWeight on a custom
+// fontFamily unless the family itself is the weight-specific file, so the weight
+// really is the font choice here, not a style override on top of it.
 export const type = {
-  display: { fontSize: 32, fontWeight: "700" as const, letterSpacing: -0.6 },
-  h1: { fontSize: 24, fontWeight: "700" as const, letterSpacing: -0.3 },
-  h2: { fontSize: 19, fontWeight: "600" as const, letterSpacing: -0.2 },
-  body: { fontSize: 16, fontWeight: "400" as const },
-  bodyStrong: { fontSize: 16, fontWeight: "600" as const },
-  caption: { fontSize: 13, fontWeight: "500" as const },
-  label: { fontSize: 11.5, fontWeight: "700" as const, letterSpacing: 0.8 },
+  display: { fontFamily: "Inter_700Bold", fontSize: 32, letterSpacing: -0.6 },
+  h1: { fontFamily: "Inter_700Bold", fontSize: 24, letterSpacing: -0.3 },
+  h2: { fontFamily: "Inter_600SemiBold", fontSize: 19, letterSpacing: -0.2 },
+  body: { fontFamily: "Inter_400Regular", fontSize: 16 },
+  bodyStrong: { fontFamily: "Inter_600SemiBold", fontSize: 16 },
+  caption: { fontFamily: "Inter_500Medium", fontSize: 13 },
+  label: { fontFamily: "Inter_700Bold", fontSize: 11.5, letterSpacing: 0.8 },
 } as const;
 
 // Minimum interactive dimension for a gloved finger, per CLAUDE.md section 6.

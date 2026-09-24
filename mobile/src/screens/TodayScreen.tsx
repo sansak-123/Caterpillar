@@ -167,7 +167,11 @@ function TaskBody({
     danger: t("risk.danger"),
   };
   return (
-    <>
+    // Card/GlassCard apply `gap` to their own direct children — this wrapper (needed so
+    // Maestro/testID can address one task's contents specifically, since two upcoming
+    // tasks otherwise render identical text/labels) reproduces that same gap itself so
+    // the internal spacing doesn't collapse now that Card only sees one child.
+    <View testID={`task-card-${task.id}`} style={{ gap: spacing.sm }}>
       <View style={styles.taskHeader}>
         <Text style={[type.bodyStrong, { color: colors.textPrimary, flex: 1 }]} numberOfLines={2}>
           {task.title}
@@ -175,6 +179,7 @@ function TaskBody({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Read task aloud"
+          testID={`task-${task.id}-speak`}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             onSpeak();
@@ -221,14 +226,32 @@ function TaskBody({
       <View style={styles.actionsRow}>
         {task.status === "in_progress" ? (
           <>
-            <PrimaryButton label={t("task.complete")} onPress={onComplete} variant="primary" fullWidth={false} />
-            <PrimaryButton label={t("task.pause")} onPress={onPause} variant="secondary" fullWidth={false} />
+            <PrimaryButton
+              label={t("task.complete")}
+              onPress={onComplete}
+              variant="primary"
+              fullWidth={false}
+              testID={`task-${task.id}-complete`}
+            />
+            <PrimaryButton
+              label={t("task.pause")}
+              onPress={onPause}
+              variant="secondary"
+              fullWidth={false}
+              testID={`task-${task.id}-pause`}
+            />
           </>
         ) : (
-          <PrimaryButton label={t("task.start")} onPress={onStart} variant="secondary" fullWidth={false} />
+          <PrimaryButton
+            label={t("task.start")}
+            onPress={onStart}
+            variant="secondary"
+            fullWidth={false}
+            testID={`task-${task.id}-start`}
+          />
         )}
       </View>
-    </>
+    </View>
   );
 }
 
@@ -336,6 +359,7 @@ export function TodayScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Demo panel"
+                testID="open-demo-panel"
                 onPress={() => router.push("/demo")}
                 style={[styles.iconButton, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}
               >
@@ -384,12 +408,14 @@ export function TodayScreen() {
                 sublabel={t("quickActions.doneCount", { done: checkedCount, total: PRE_START_CHECKLIST.length })}
                 onPress={() => router.push("/checklist")}
                 colors={colors}
+                testID="open-checklist"
               />
               <ShiftToolButton
                 label={t("quickActions.endOfShiftLog")}
                 sublabel={t("quickActions.autoFilled")}
                 onPress={() => router.push("/shift-log")}
                 colors={colors}
+                testID="open-shift-log"
               />
             </View>
           </Animated.View>
@@ -442,14 +468,17 @@ function ShiftToolButton({
   sublabel,
   onPress,
   colors,
+  testID,
 }: {
   label: string;
   sublabel: string;
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
+  testID?: string;
 }) {
   return (
     <Pressable
+      testID={testID}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();

@@ -2,6 +2,13 @@ import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from "@expo-google-fonts/inter";
 
 import "../i18n"; // side-effect: initializes i18next once, before any screen renders translated text
 
@@ -14,6 +21,12 @@ export default function RootLayout() {
   const colors = useColors();
   const setSession = useAuthStore((s) => s.setSession);
   const hydrate = useAuthStore((s) => s.hydrate);
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
 
   // Bootstrapped once, here, rather than by whichever screen happens to mount first —
   // every screen just reads the token reactively from useAuthStore afterwards. Stands
@@ -37,6 +50,11 @@ export default function RootLayout() {
   // CLAUDE.md §3.1: the sync engine runs continuously from app start, regardless of
   // which tab is active — mounted once here, not per-screen.
   useSyncEngine();
+
+  // Bundled locally (no network wait) — a brief blank frame beats every piece of text
+  // flashing from the system font to Inter a moment after first paint.
+  if (!fontsLoaded) return null;
+
   return (
     <SafeAreaProvider>
       <StatusBar style={colors.mode === "light" ? "dark" : "light"} />

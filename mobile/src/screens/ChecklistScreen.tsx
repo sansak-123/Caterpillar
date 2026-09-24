@@ -37,6 +37,7 @@ export function ChecklistScreen() {
               return (
                 <Animated.View key={item.id} entering={FadeInDown.delay(i * 50).duration(300)}>
                   <Pressable
+                    testID={`checklist-item-${item.id}`}
                     onPress={() => {
                       Haptics.selectionAsync();
                       toggle(item.id);
@@ -65,6 +66,7 @@ export function ChecklistScreen() {
           </View>
 
           <PrimaryButton
+            testID="checklist-start-shift"
             label={allDone ? "Start shift" : `Complete ${PRE_START_CHECKLIST.length - doneCount} more to start`}
             onPress={() => {
               if (!allDone) return;
@@ -74,7 +76,7 @@ export function ChecklistScreen() {
             variant={allDone ? "primary" : "secondary"}
           />
           {doneCount > 0 ? (
-            <PrimaryButton label="Reset" onPress={reset} variant="secondary" fullWidth={false} />
+            <PrimaryButton testID="checklist-reset" label="Reset" onPress={reset} variant="secondary" fullWidth={false} />
           ) : null}
         </ScrollView>
       </SafeAreaView>
