@@ -1,4 +1,4 @@
-import { InferenceSession, Tensor } from "onnxruntime-react-native";
+import { Platform } from "react-native";
 
 import { getCurrentModelBundle } from "../assets/downloadManager";
 import { buildFeatureVector, type FeatureSchema, type TaskFeatureContext } from "./featureVector";
@@ -11,14 +11,35 @@ export type OfflineTaskTimeEstimate = {
   modelVersion: string;
 };
 
-// One session per local model file, reused across calls — creating a session re-reads
-// and re-initializes the ONNX graph, which is wasteful to redo on every re-score.
+// onnxruntime-react-native is native-only, same as expo-task-manager/expo-background-
+// fetch elsewhere in this codebase (see engine.ts's registerBackgroundSync). A plain
+// top-level `import` of it crashes the web bundle immediately at module-load time
+// ("Cannot read properties of undefined (reading 'install')") — not just when a
+// function actually calls it — because import statements execute unconditionally
+// wherever the containing module is loaded, before any Platform.OS check could run.
+// These are type-only imports (erased at compile time, no runtime cost). The real
+// module is loaded via a lazy `require()` in loadOrt() rather than a dynamic
+// `import()`: this project's Jest/Babel setup doesn't support a bare `import()`
+// expression ("invoked without --experimental-vm-modules"), while `require()` inside a
+// function body is the one form Metro, Node, and Jest's CJS transform all handle
+// identically — evaluated only when that line actually runs, which is only ever
+// reached after the web guard in estimateTaskTimeOffline has already returned.
+type OrtModule = typeof import("onnxruntime-react-native");
+type InferenceSession = import("onnxruntime-react-native").InferenceSession;
+
 const sessionCache = new Map<string, Promise<InferenceSession>>();
 
+function loadOrt(): OrtModule {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require("onnxruntime-react-native");
+}
+
+// One session per local model file, reused across calls — creating a session re-reads
+// and re-initializes the ONNX graph, which is wasteful to redo on every re-score.
 function loadSession(uri: string): Promise<InferenceSession> {
   let session = sessionCache.get(uri);
   if (!session) {
-    session = InferenceSession.create(uri);
+    session = loadOrt().InferenceSession.create(uri);
     sessionCache.set(uri, session);
   }
   return session;
@@ -32,6 +53,7 @@ export function _resetSessionCacheForTests(): void {
 }
 
 async function runRatio(session: InferenceSession, vector: Float32Array): Promise<number> {
+  const { Tensor } = loadOrt();
   const inputName = session.inputNames[0];
   const feeds = { [inputName]: new Tensor("float32", vector, [1, vector.length]) };
   const results = await session.run(feeds);
@@ -43,14 +65,18 @@ async function runRatio(session: InferenceSession, vector: Float32Array): Promis
 /**
  * Re-scores a task's duration entirely on-device from the currently-downloaded model
  * bundle — CLAUDE.md §3.1: "offline re-scoring uses ONNX and marks explanation
- * 'approximate (offline)'." Returns null only when no bundle has been downloaded yet
- * (e.g. never been online), never throws for a missing/unmapped context field — those
- * fall back to documented neutral values in buildFeatureVector instead.
+ * 'approximate (offline)'." Returns null when no bundle has been downloaded yet (e.g.
+ * never been online) or on web (no onnxruntime-react-native build exists for it, same
+ * as expo-file-system's model download itself not working on web) — never throws for a
+ * missing/unmapped context field, those fall back to documented neutral values in
+ * buildFeatureVector instead.
  */
 export async function estimateTaskTimeOffline(
   estMin: number,
   context: TaskFeatureContext
 ): Promise<OfflineTaskTimeEstimate | null> {
+  if (Platform.OS === "web") return null;
+
   const bundle = await getCurrentModelBundle();
   if (!bundle) return null;
 

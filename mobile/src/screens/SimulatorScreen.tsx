@@ -23,6 +23,7 @@ import {
   type SimStatus,
   type UnitySimHandle,
 } from "../lib/unity/bridge";
+import { useTrainingProgressStore } from "../store/trainingProgress";
 
 type LogKind = "incident" | "proximity" | "ghost" | "nearmiss" | "idle" | "welfare" | "result";
 type LogItem = { id: string; text: string; kind: LogKind; scenario: ScenarioName; at: number };
@@ -118,6 +119,7 @@ export default function SimulatorScreen() {
   const focused = toScenario(rawScenario) !== "Free";
 
   const sim = useRef<UnitySimHandle>(null);
+  const recordSession = useTrainingProgressStore(st => st.recordSession);
   const scenarioRef = useRef<ScenarioName>(toScenario(rawScenario));
   const [scenario, setScenario] = useState<ScenarioName>(() => toScenario(rawScenario));
   const [ready, setReady] = useState(false);
@@ -166,6 +168,7 @@ export default function SimulatorScreen() {
       case "ghost_score":
         // TODO: training_progress + outbox → backend updates ghost_skill_factor (USP-1)
         setLastScore(m.data);
+        recordSession(scenarioRef.current, m.data); // feeds the Training tab's "Your progress" card
         addLog(`Ghost Operator: skill ${m.data.skill_factor.toFixed(2)}, match ${Math.round(m.data.match_pct)}%`, "ghost");
         break;
       case "near_miss":
@@ -201,7 +204,7 @@ export default function SimulatorScreen() {
       case "ghost_trace":
         break;
     }
-  }, [addLog, runScenario]);
+  }, [addLog, runScenario, recordSession]);
 
   const replaySeedDay = () => {
     sim.current?.send(SimCommands.setMode("telemetry"));

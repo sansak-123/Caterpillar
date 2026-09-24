@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
-import { AssistantIcon } from "../components/icons";
+import { AssistantIcon, MicIcon, StopIcon } from "../components/icons";
 import { Badge } from "../components/Badge";
 import { ConnectivityPill } from "../components/ConnectivityPill";
 import { GlassCard } from "../components/GlassCard";
@@ -191,6 +191,7 @@ export function AssistantScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={voice.listening ? "Stop listening" : "Start voice input"}
+              testID="assistant-mic-button"
               onPress={toggleMic}
               style={[
                 styles.micButton,
@@ -198,7 +199,11 @@ export function AssistantScreen() {
                 shadow.glow(voice.listening ? colors.dangerGlow : colors.accentGlow),
               ]}
             >
-              <Text style={[styles.micGlyph, { color: colors.accentOn }]}>{voice.listening ? "■" : "●"}</Text>
+              {voice.listening ? (
+                <StopIcon color={colors.accentOn} size={18} />
+              ) : (
+                <MicIcon color={colors.accentOn} size={20} />
+              )}
             </Pressable>
           </View>
         </View>
@@ -256,6 +261,11 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: spacing.md,
+    // The tab bar floats over the screen (position: absolute, height 72 — see
+    // (tabs)/_layout.tsx) instead of reserving layout space, so without this the input
+    // bar (and its mic button) renders right underneath it, invisible/unreachable —
+    // other screens compensate the same way (e.g. TrainingScreen's content style).
+    paddingBottom: 72 + spacing.md,
     gap: spacing.md,
   },
   headerRow: {
@@ -357,8 +367,5 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-  },
-  micGlyph: {
-    fontSize: 14,
   },
 });

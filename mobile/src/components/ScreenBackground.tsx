@@ -11,9 +11,15 @@ export function ScreenBackground({ children }: PropsWithChildren) {
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <LinearGradient
-        colors={[colors.bgGlowTop, colors.bg, colors.bg]}
-        locations={[0, 0.4, 1]}
+        colors={[colors.bgGlowTop, colors.bg, colors.bg, colors.accentGlow]}
+        locations={[0, 0.35, 0.75, 1]}
         style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={["transparent", colors.accent]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.topEdge}
       />
       {children}
     </View>
@@ -23,5 +29,12 @@ export function ScreenBackground({ children }: PropsWithChildren) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  topEdge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
   },
 });

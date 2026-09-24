@@ -52,6 +52,7 @@ export function DemoPanelScreen() {
             <View style={styles.rowBetween}>
               <Text style={[type.h2, { color: colors.textPrimary }]}>Cut network</Text>
               <Switch
+                testID="demo-cut-network-switch"
                 value={devNetworkCut}
                 onValueChange={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

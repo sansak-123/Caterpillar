@@ -55,7 +55,9 @@ async def _login_supervisor(client: AsyncClient) -> str:
     return resp.json()["access_token"]
 
 
-async def test_explain_estimate_uses_real_seeded_task(client: AsyncClient, seeded: dict) -> None:
+async def test_explain_estimate_uses_real_seeded_task(
+    client: AsyncClient, seeded: dict, no_openrouter_key: None
+) -> None:
     token = await _login_operator(client)
     resp = await client.post(
         "/assistant/chat",
@@ -65,7 +67,7 @@ async def test_explain_estimate_uses_real_seeded_task(client: AsyncClient, seede
     assert resp.status_code == 200
     data = resp.json()
     assert data["intent"] == "explain_estimate"
-    # No OPENROUTER_API_KEY in the test env, so this must be the grounded template, not
+    # Forced no-key (see no_openrouter_key), so this must be the grounded template, not
     # an LLM call — and it must be built from the seeded task, not invented.
     assert data["source"] == "grounded"
     assert "Earth Excavation" in data["reply"]
@@ -85,7 +87,7 @@ async def test_why_flagged_with_no_alerts_reads_as_clean(client: AsyncClient, se
 
 
 async def test_safety_question_answers_from_kb_without_key(
-    client: AsyncClient, seeded: dict
+    client: AsyncClient, seeded: dict, no_openrouter_key: None
 ) -> None:
     token = await _login_operator(client)
     resp = await client.post(

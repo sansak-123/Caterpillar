@@ -14,7 +14,7 @@ import datetime as dt
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -141,6 +141,38 @@ async def load_all() -> dict[str, int]:
         counts["sites"] = await _load_sites(session)
         counts["operators"] = await _load_operators(session)
         counts["tasks"] = await _load_schedule_today(session)
+        await session.commit()
+    return counts
+
+
+async def ensure_seeded() -> dict[str, int]:
+    """Called once on API startup (app/main.py's lifespan) — safe to run every time the
+    server starts, every day, not just the first.
+
+    Reference data (machines/sites/operators) is a harmless upsert either way. The task
+    schedule is the part that needs care: `_load_schedule_today` deletes and reloads
+    every Task row, which would blow away whatever the operator already
+    started/completed today if run unconditionally. So this only (re)loads the schedule
+    when today has none yet — a fresh day, or a first-ever run against an empty DB —
+    which is exactly the "today's schedule should always mean today" gap
+    `_load_schedule_today`'s own docstring flagged: it fixed the date at *load* time,
+    but nothing re-ran it on a *later* day, so /tasks/today would quietly go empty again
+    the very next time the server was started on a new calendar date.
+    """
+    counts: dict[str, int] = {}
+    async with async_session_factory() as session:
+        counts["machines"] = await _load_machines(session)
+        counts["sites"] = await _load_sites(session)
+        counts["operators"] = await _load_operators(session)
+
+        today = dt.date.today()
+        todays_task_count = await session.scalar(
+            select(func.count()).select_from(Task).where(Task.scheduled_date == today)
+        )
+        if todays_task_count:
+            counts["tasks"] = todays_task_count
+        else:
+            counts["tasks"] = await _load_schedule_today(session)
         await session.commit()
     return counts
 

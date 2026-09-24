@@ -19,8 +19,14 @@ class Settings(BaseSettings):
     # free catalog before deploying; free-tier model availability changes over time.
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    assistant_fast_model: str = "meta-llama/llama-3.1-8b-instruct:free"
-    assistant_strong_model: str = "google/gemini-2.0-flash-exp:free"
+    # OpenRouter's free-tier catalog turns over — both defaults below were verified
+    # live against https://openrouter.ai/api/v1/models on 2026-09-24; the previous
+    # defaults (llama-3.1-8b-instruct:free, gemini-2.0-flash-exp:free) had been pulled
+    # from the free tier and returned 404s. If these ever go stale too, query that
+    # endpoint for pricing.prompt == "0" && pricing.completion == "0" rather than
+    # guessing a slug from memory.
+    assistant_fast_model: str = "nex-agi/nex-n2.5-mini:free"
+    assistant_strong_model: str = "nvidia/nemotron-3-super-120b-a12b:free"
 
 
 @lru_cache

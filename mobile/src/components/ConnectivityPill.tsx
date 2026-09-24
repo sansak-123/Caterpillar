@@ -19,9 +19,9 @@ export function ConnectivityPill() {
   const glowFor = { online: colors.safeGlow, offline: colors.dangerGlow, syncing: colors.cautionGlow } as const;
 
   return (
-    <View style={[styles.pill, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+    <View testID="connectivity-pill" style={[styles.pill, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
       <View style={[styles.dot, { backgroundColor: dotColorFor[status] }, shadow.glow(glowFor[status])]} />
-      <Text style={[type.caption, { color: colors.textSecondary }]}>
+      <Text testID="connectivity-pill-label" style={[type.caption, { color: colors.textSecondary }]}>
         {labelFor[status]}
         {queuedCount > 0 ? ` · ${queuedCount} queued` : ""}
       </Text>

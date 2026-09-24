@@ -3,6 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
@@ -11,19 +13,22 @@ import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
 import { ConnectivityPill } from "../components/ConnectivityPill";
 import { GlassCard } from "../components/GlassCard";
-import { FlaskIcon, HazardIcon, SpeakerIcon } from "../components/icons";
+import { CheckIcon, FlaskIcon, HazardIcon, SpeakerIcon } from "../components/icons";
 import { InsightCard } from "../components/InsightCard";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ProgressRing } from "../components/ProgressRing";
 import { ScreenBackground } from "../components/ScreenBackground";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { PRE_START_CHECKLIST } from "../content/preStartChecklist";
-import { fetchTasksToday, type ApiTask } from "../lib/api/client";
+import { DEMO_MACHINE_ID, fetchTasksToday, type ApiTask } from "../lib/api/client";
+import { localeFor } from "../lib/assistant/voice";
 import { estimateTaskTimeOffline } from "../lib/onnx/taskTimeModel";
 import { appendToOutbox } from "../lib/sync/outbox";
 import { useAuthStore } from "../store/auth";
 import { useChecklistStore } from "../store/checklist";
 import { useConnectivityStore } from "../store/connectivity";
+import { useLanguageStore } from "../store/language";
 import { useColors } from "../theme/useColors";
 import { radius, shadow, spacing, touchTarget, type } from "../theme/tokens";
 
@@ -102,12 +107,6 @@ const mockTasks: Task[] = [
   },
 ];
 
-const riskLabel: Record<Task["risk"], string> = {
-  safe: "Low risk",
-  caution: "Weather risk",
-  danger: "High risk",
-};
-
 function mapApiTask(t: ApiTask): Task {
   const risk: Task["risk"] = t.risk_band === "danger" ? "danger" : t.risk_band === "caution" ? "caution" : "safe";
   const status: TaskStatus = t.status === "in_progress" || t.status === "done" ? t.status : "pending";
@@ -126,32 +125,53 @@ function mapApiTask(t: ApiTask): Task {
   };
 }
 
-function speakTask(task: Task) {
-  const hazardText = task.hazards.length ? ` Known hazards: ${task.hazards.join(". ")}.` : "";
-  const depthText = task.depth !== "—" ? ` Dig depth ${task.depth}.` : "";
-  Speech.speak(
-    `${task.title}.${depthText} Estimated ${task.p50Min} to ${task.p90Min} minutes.${hazardText}`,
-    { rate: 0.95 }
-  );
+// CLAUDE.md §2.1 Rule 6: "a voice read-out in the operator's own language (en/hi/ta)" —
+// both the words spoken AND the TTS voice/accent (`localeFor`) switch with `language`.
+function speakTask(task: Task, t: TFunction, language: Parameters<typeof localeFor>[0]) {
+  const hazardText = task.hazards.length
+    ? t("voice.knownHazards", { hazards: task.hazards.join(". ") })
+    : "";
+  const depthText = task.depth !== "—" ? t("voice.digDepth", { depth: task.depth }) : "";
+  const text = t("voice.taskReadout", {
+    title: task.title,
+    depthText,
+    p50: task.p50Min,
+    p90: task.p90Min,
+    hazardText,
+  });
+  Speech.speak(text, { rate: 0.95, language: localeFor(language) });
 }
 
 function TaskBody({
   task,
   colors,
+  t,
   onStart,
   onPause,
   onComplete,
+  onSpeak,
   offlineEstimate,
 }: {
   task: Task;
   colors: ReturnType<typeof useColors>;
+  t: TFunction;
   onStart: () => void;
   onPause: () => void;
   onComplete: () => void;
+  onSpeak: () => void;
   offlineEstimate?: { p50: number; p90: number } | null;
 }) {
+  const riskLabel: Record<Task["risk"], string> = {
+    safe: t("risk.safe"),
+    caution: t("risk.caution"),
+    danger: t("risk.danger"),
+  };
   return (
-    <>
+    // Card/GlassCard apply `gap` to their own direct children — this wrapper (needed so
+    // Maestro/testID can address one task's contents specifically, since two upcoming
+    // tasks otherwise render identical text/labels) reproduces that same gap itself so
+    // the internal spacing doesn't collapse now that Card only sees one child.
+    <View testID={`task-card-${task.id}`} style={{ gap: spacing.sm }}>
       <View style={styles.taskHeader}>
         <Text style={[type.bodyStrong, { color: colors.textPrimary, flex: 1 }]} numberOfLines={2}>
           {task.title}
@@ -159,21 +179,22 @@ function TaskBody({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Read task aloud"
+          testID={`task-${task.id}-speak`}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            speakTask(task);
+            onSpeak();
           }}
           style={styles.speakerButton}
         >
           <SpeakerIcon color={colors.textSecondary} size={20} />
         </Pressable>
-        {task.status === "in_progress" ? <Badge label="In progress" tone="info" /> : null}
+        {task.status === "in_progress" ? <Badge label={t("today.inProgress")} tone="info" /> : null}
       </View>
 
       <View style={styles.taskMetaRow}>
         <Badge label={task.weather} tone="neutral" />
         <Badge label={riskLabel[task.risk]} tone={task.risk} />
-        {task.depth !== "—" ? <Badge label={`Depth ${task.depth}`} tone="neutral" /> : null}
+        {task.depth !== "—" ? <Badge label={`${t("task.depth")} ${task.depth}`} tone="neutral" /> : null}
       </View>
 
       {task.hazards.length ? (
@@ -186,9 +207,9 @@ function TaskBody({
       ) : null}
 
       <Text style={type.caption}>
-        <Text style={{ color: colors.textMuted }}>Est. </Text>
+        <Text style={{ color: colors.textMuted }}>{t("task.est")} </Text>
         <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{task.p50Min}</Text>
-        <Text style={{ color: colors.textMuted }}>–{task.p90Min} min (P50–P90)</Text>
+        <Text style={{ color: colors.textMuted }}>–{task.p90Min} {t("task.minRange")}</Text>
       </Text>
 
       {offlineEstimate ? (
@@ -196,33 +217,53 @@ function TaskBody({
         // marked "approximate (offline)" — never presented as equivalent to the
         // server's fully-informed, SHAP-explained estimate from morning sync.
         <Text style={[type.caption, { fontStyle: "italic" }]}>
-          <Text style={{ color: colors.textMuted }}>~Re-scored offline: </Text>
+          <Text style={{ color: colors.textMuted }}>{t("task.reScoredOffline")} </Text>
           <Text style={{ color: colors.textSecondary, fontWeight: "700" }}>{offlineEstimate.p50}</Text>
-          <Text style={{ color: colors.textMuted }}>–{offlineEstimate.p90} min (approximate)</Text>
+          <Text style={{ color: colors.textMuted }}>–{offlineEstimate.p90} {t("task.minApproximate")}</Text>
         </Text>
       ) : null}
 
       <View style={styles.actionsRow}>
         {task.status === "in_progress" ? (
           <>
-            <PrimaryButton label="Complete" onPress={onComplete} variant="primary" fullWidth={false} />
-            <PrimaryButton label="Pause" onPress={onPause} variant="secondary" fullWidth={false} />
+            <PrimaryButton
+              label={t("task.complete")}
+              onPress={onComplete}
+              variant="primary"
+              fullWidth={false}
+              testID={`task-${task.id}-complete`}
+            />
+            <PrimaryButton
+              label={t("task.pause")}
+              onPress={onPause}
+              variant="secondary"
+              fullWidth={false}
+              testID={`task-${task.id}-pause`}
+            />
           </>
         ) : (
-          <PrimaryButton label="Start task" onPress={onStart} variant="secondary" fullWidth={false} />
+          <PrimaryButton
+            label={t("task.start")}
+            onPress={onStart}
+            variant="secondary"
+            fullWidth={false}
+            testID={`task-${task.id}-start`}
+          />
         )}
       </View>
-    </>
+    </View>
   );
 }
 
 export function TodayScreen() {
   const colors = useColors();
+  const { t } = useTranslation();
+  const language = useLanguageStore((s) => s.language);
   const checkedCount = useChecklistStore((s) => s.checkedIds.size);
   const devNetworkCut = useConnectivityStore((s) => s.devNetworkCut);
+  const connectivityStatus = useConnectivityStore((s) => s.status);
   const token = useAuthStore((s) => s.token);
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
-  const [isLive, setIsLive] = useState(false);
   const [offlineEstimates, setOfflineEstimates] = useState<Record<string, { p50: number; p90: number }>>({});
 
   // Session bootstrap and connectivity status/queued-count are owned by the root
@@ -237,7 +278,6 @@ export function TodayScreen() {
         const apiTasks = await fetchTasksToday(token);
         if (cancelled) return;
         setTasks(apiTasks.map(mapApiTask));
-        setIsLive(true);
       } catch {
         // Backend reachable enough for a token but not for this call — keep whatever
         // was already showing (demo data or the last successful live fetch).
@@ -312,17 +352,19 @@ export function TodayScreen() {
           <View style={styles.headerRow}>
             <View>
               <Text style={[type.label, { color: colors.textMuted }]}>WED, 1 MAY</Text>
-              <Text style={[type.display, { color: colors.textPrimary }]}>Today&apos;s tasks</Text>
+              <Text style={[type.display, { color: colors.textPrimary }]}>{t("today.title")}</Text>
             </View>
             <View style={styles.headerActions}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Demo panel"
+                testID="open-demo-panel"
                 onPress={() => router.push("/demo")}
                 style={[styles.iconButton, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}
               >
                 <FlaskIcon color={colors.textSecondary} size={18} />
               </Pressable>
+              <LanguageSwitcher />
               <ThemeToggle />
               <ConnectivityPill />
             </View>
@@ -339,20 +381,35 @@ export function TodayScreen() {
 
           <Animated.View entering={FadeInDown.delay(80).duration(400)}>
             <Card style={styles.progressCard}>
-              <ProgressRing
-                progress={tasks.length ? doneCount / tasks.length : 0}
-                size={92}
-                strokeWidth={9}
-                color={colors.accent}
-                trackColor={colors.ringTrack}
-                value={`${doneCount}/${tasks.length}`}
-                valueColor={colors.textPrimary}
-              />
-              <View style={styles.progressText}>
-                <Text style={[type.h2, { color: colors.textPrimary }]}>OP1001 · EXC001</Text>
-                <Text style={[type.caption, { color: colors.textMuted }]}>
-                  {tasks.length} tasks scheduled today · {isLive ? "live from backend" : "demo data"} — reorder anytime
-                </Text>
+              <View style={styles.progressTop}>
+                <ProgressRing
+                  progress={tasks.length ? doneCount / tasks.length : 0}
+                  size={92}
+                  strokeWidth={9}
+                  color={colors.accent}
+                  trackColor={colors.ringTrack}
+                  value={`${doneCount}/${tasks.length}`}
+                  valueColor={colors.textPrimary}
+                />
+                <View style={styles.progressText}>
+                  <Text style={[type.h2, { color: colors.textPrimary }]}>OP1001 · {DEMO_MACHINE_ID}</Text>
+                  <Text style={[type.caption, { color: colors.textMuted }]}>
+                    {t("today.tasksScheduled", { count: tasks.length })} — {t("today.reorderAnytime")}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.statusList}>
+                <StatusRow
+                  ok={checkedCount === PRE_START_CHECKLIST.length}
+                  label={`Pre-start checklist ${checkedCount}/${PRE_START_CHECKLIST.length}`}
+                  colors={colors}
+                />
+                <StatusRow ok={doneCount === tasks.length && tasks.length > 0} label={`${doneCount}/${tasks.length} tasks complete`} colors={colors} />
+                <StatusRow
+                  ok={!devNetworkCut && connectivityStatus === "online"}
+                  label={devNetworkCut ? "Offline (dev mode)" : connectivityStatus === "online" ? "Synced" : "Syncing…"}
+                  colors={colors}
+                />
               </View>
             </Card>
           </Animated.View>
@@ -360,16 +417,18 @@ export function TodayScreen() {
           <Animated.View entering={FadeInDown.delay(110).duration(400)}>
             <View style={styles.shiftToolsRow}>
               <ShiftToolButton
-                label="Pre-start checklist"
-                sublabel={`${checkedCount}/${PRE_START_CHECKLIST.length} done`}
+                label={t("quickActions.preStartChecklist")}
+                sublabel={t("quickActions.doneCount", { done: checkedCount, total: PRE_START_CHECKLIST.length })}
                 onPress={() => router.push("/checklist")}
                 colors={colors}
+                testID="open-checklist"
               />
               <ShiftToolButton
-                label="End-of-shift log"
-                sublabel="Auto-filled"
+                label={t("quickActions.endOfShiftLog")}
+                sublabel={t("quickActions.autoFilled")}
                 onPress={() => router.push("/shift-log")}
                 colors={colors}
+                testID="open-shift-log"
               />
             </View>
           </Animated.View>
@@ -377,20 +436,22 @@ export function TodayScreen() {
           {inProgress ? (
             <Animated.View entering={FadeInDown.delay(140).duration(400)}>
               <GlassCard glowColor={colors.infoGlow} style={styles.heroTask}>
-                <Text style={[type.label, { color: colors.info }]}>IN PROGRESS</Text>
+                <Text style={[type.label, { color: colors.info }]}>{t("today.inProgress").toUpperCase()}</Text>
                 <TaskBody
                   task={inProgress}
                   colors={colors}
+                  t={t}
                   onStart={() => changeTaskStatus(inProgress, "in_progress")}
                   onPause={() => changeTaskStatus(inProgress, "pending")}
                   onComplete={() => changeTaskStatus(inProgress, "done")}
+                  onSpeak={() => speakTask(inProgress, t, language)}
                   offlineEstimate={offlineEstimates[inProgress.id]}
                 />
               </GlassCard>
             </Animated.View>
           ) : null}
 
-          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Up next</Text>
+          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>{t("today.upNext")}</Text>
           <View style={styles.taskList}>
             {upcoming.map((task, i) => (
               <Animated.View key={task.id} entering={FadeInDown.delay(200 + i * 70).duration(400)}>
@@ -398,9 +459,11 @@ export function TodayScreen() {
                   <TaskBody
                     task={task}
                     colors={colors}
+                    t={t}
                     onStart={() => changeTaskStatus(task, "in_progress")}
                     onPause={() => changeTaskStatus(task, "pending")}
                     onComplete={() => changeTaskStatus(task, "done")}
+                    onSpeak={() => speakTask(task, t, language)}
                     offlineEstimate={offlineEstimates[task.id]}
                   />
                 </Card>
@@ -413,19 +476,37 @@ export function TodayScreen() {
   );
 }
 
+function StatusRow({ ok, label, colors }: { ok: boolean; label: string; colors: ReturnType<typeof useColors> }) {
+  return (
+    <View style={styles.statusRow}>
+      <View style={[styles.statusDot, { backgroundColor: ok ? `${colors.safe}22` : `${colors.caution}22` }]}>
+        {ok ? (
+          <CheckIcon color={colors.safe} size={12} />
+        ) : (
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.caution }} />
+        )}
+      </View>
+      <Text style={[type.caption, { color: colors.textSecondary }]}>{label}</Text>
+    </View>
+  );
+}
+
 function ShiftToolButton({
   label,
   sublabel,
   onPress,
   colors,
+  testID,
 }: {
   label: string;
   sublabel: string;
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
+  testID?: string;
 }) {
   return (
     <Pressable
+      testID={testID}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
@@ -472,6 +553,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   progressCard: {
+    gap: spacing.md,
+  },
+  progressTop: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
@@ -479,6 +563,21 @@ const styles = StyleSheet.create({
   progressText: {
     flex: 1,
     gap: 2,
+  },
+  statusList: {
+    gap: spacing.xs,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  statusDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   heroTask: {
     marginTop: spacing.xs,

@@ -11,9 +11,11 @@
       "typedRoutes": true
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.operatoros.app"
     },
     "android": {
+      "package": "com.operatoros.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -30,7 +32,9 @@
       "expo-speech-recognition",
       "expo-sqlite",
       "expo-secure-store",
-      "onnxruntime-react-native"
+      "onnxruntime-react-native",
+      "expo-localization",
+      "expo-font"
     ]
   }
 }

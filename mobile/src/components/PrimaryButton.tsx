@@ -14,11 +14,13 @@ export function PrimaryButton({
   onPress,
   variant = "primary",
   fullWidth = true,
+  testID,
 }: {
   label: string;
   onPress: () => void;
   variant?: Variant;
   fullWidth?: boolean;
+  testID?: string;
 }) {
   const colors = useColors();
   const scale = useSharedValue(1);
@@ -43,6 +45,7 @@ export function PrimaryButton({
   return (
     <AnimatedPressable
       accessibilityRole="button"
+      testID={testID}
       onPressIn={() => {
         // Reanimated shared values are intentionally mutable refs (the documented
         // API) — the React Compiler lint rule doesn't know that exception yet.

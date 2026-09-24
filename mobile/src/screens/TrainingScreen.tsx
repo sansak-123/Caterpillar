@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { router } from "expo-router";
 
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
-import { GlassCard } from "../components/GlassCard";
+import { CheckIcon } from "../components/icons";
 import { PrimaryButton } from "../components/PrimaryButton";
-import { ProgressRing } from "../components/ProgressRing";
 import { ScreenBackground } from "../components/ScreenBackground";
 import {
   beginnerPath,
@@ -16,8 +16,12 @@ import {
   type Lesson,
   type LessonCategory,
 } from "../content/trainingLibrary";
+import { postBookingRequest, type BookingResponse } from "../lib/api/client";
+import { useAuthStore } from "../store/auth";
+import { useLanguageStore } from "../store/language";
+import { formatPracticeDuration, totalPracticeSeconds, useTrainingProgressStore } from "../store/trainingProgress";
 import { useColors } from "../theme/useColors";
-import { radius, spacing, type } from "../theme/tokens";
+import { radius, spacing, touchTarget, type } from "../theme/tokens";
 
 const categoryTone: Record<LessonCategory, "safe" | "caution" | "danger" | "info" | "neutral"> = {
   safety: "danger",
@@ -37,8 +41,8 @@ type Scenario = {
 const scenarios: Scenario[] = [
   {
     id: "GhostOperator",
-    title: "Ghost Operator",
-    description: "Dig alongside a translucent replay of an expert's cycle. Scored on time, smoothness, fuel/cycle.",
+    title: "Train with Expert",
+    description: "Dig alongside a replay of an expert operator's cycle. Scored on time, smoothness, fuel/cycle.",
     tag: "Recommended",
   },
   {
@@ -71,56 +75,74 @@ const scenarios: Scenario[] = [
 
 export function TrainingScreen() {
   const colors = useColors();
+  const token = useAuthStore((s) => s.token);
+  const language = useLanguageStore((s) => s.language);
   const firstWeekPath = beginnerPath();
   const [showRefreshers, setShowRefreshers] = useState(false);
+  const completedLessonIds = useTrainingProgressStore((s) => s.completedLessonIds);
+  const markLessonComplete = useTrainingProgressStore((s) => s.markLessonComplete);
+  const markLessonIncomplete = useTrainingProgressStore((s) => s.markLessonIncomplete);
+  const sessions = useTrainingProgressStore((s) => s.sessions);
+  const bestSkillFactor = sessions.length ? Math.max(...sessions.map((s) => s.skillFactor)) : null;
+  const [booking, setBooking] = useState<
+    { status: "idle" } | { status: "loading" } | { status: "error"; message: string } | { status: "done"; result: BookingResponse }
+  >({ status: "idle" });
+
+  async function requestBooking() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!token) {
+      setBooking({ status: "error", message: "Sign-in required — try again once the app has connected." });
+      return;
+    }
+    setBooking({ status: "loading" });
+    try {
+      const result = await postBookingRequest(token, {
+        message: "book me the next available instructor slot",
+        language,
+      });
+      setBooking({ status: "done", result });
+    } catch {
+      setBooking({ status: "error", message: "Couldn't reach the booking service — try again shortly." });
+    }
+  }
 
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.screen} edges={["top"]}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <Text style={[type.label, { color: colors.textMuted }]}>TRAINING</Text>
-          <Text style={[type.display, { color: colors.textPrimary }]}>Ghost Operator</Text>
+          <Text style={[type.display, { color: colors.textPrimary }]}>Practice &amp; learn</Text>
           <Text style={[type.body, { color: colors.textMuted }]}>
-            Unity simulator scenarios, downloadable for offline use.
+            Simulator scenarios and lessons, downloadable for offline use.
           </Text>
 
-          <Animated.View entering={FadeInDown.duration(400)}>
-            <GlassCard glowColor={colors.accentGlow} style={styles.heroCard}>
-              <View style={styles.heroTop}>
-                <View style={styles.heroPreview}>
-                  <Text style={[type.caption, { color: colors.textMuted }]}>Unity viewport</Text>
-                </View>
-                <ProgressRing
-                  progress={0.82}
-                  size={84}
-                  strokeWidth={8}
-                  color={colors.accent}
-                  trackColor={colors.ringTrack}
-                  value="0.82"
-                  label="skill"
-                  valueColor={colors.textPrimary}
-                />
-              </View>
-              <View style={styles.rowBetween}>
-                <Text style={[type.h2, { color: colors.textPrimary }]}>Your skill factor</Text>
-                <Badge label="Goal 0.90" tone="info" />
-              </View>
-              <Text style={[type.body, { color: colors.textMuted }]}>
-                Closing the gap with the ghost improves your task-time estimates automatically.
-              </Text>
-              <PrimaryButton
-                label="Launch Ghost Operator"
-                onPress={() => router.push({ pathname: "/simulator", params: { scenario: "GhostOperator" } })}
-                variant="accent"
+          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Your progress</Text>
+          <Card>
+            <View style={styles.progressGrid}>
+              <ProgressStat
+                label="Lessons completed"
+                value={`${completedLessonIds.size}/${trainingLibrary.length}`}
+                colors={colors}
               />
-            </GlassCard>
-          </Animated.View>
+              <ProgressStat label="Practice sessions" value={String(sessions.length)} colors={colors} />
+              <ProgressStat
+                label="Practice time"
+                value={sessions.length ? formatPracticeDuration(totalPracticeSeconds(sessions)) : "—"}
+                colors={colors}
+              />
+              <ProgressStat
+                label="Best skill factor"
+                value={bestSkillFactor !== null ? bestSkillFactor.toFixed(2) : "—"}
+                colors={colors}
+              />
+            </View>
+          </Card>
 
-          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>All scenarios</Text>
+          <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Practice scenarios</Text>
           <View style={styles.scenarioList}>
             {scenarios.map((s, i) => (
               <Animated.View key={s.id} entering={FadeInDown.delay(120 + i * 70).duration(400)}>
-                <Card>
+                <Card accentColor={s.tag === "Recommended" ? colors.accent : undefined}>
                   <View style={styles.rowBetween}>
                     <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>{s.title}</Text>
                     <Badge label={s.tag} tone={s.tag === "New from today" ? "danger" : "neutral"} />
@@ -129,7 +151,7 @@ export function TrainingScreen() {
                   <PrimaryButton
                     label="Run scenario"
                     onPress={() => router.push({ pathname: "/simulator", params: { scenario: s.id } })}
-                    variant="secondary"
+                    variant={s.tag === "Recommended" ? "accent" : "secondary"}
                     fullWidth={false}
                   />
                 </Card>
@@ -152,7 +174,14 @@ export function TrainingScreen() {
           <View style={styles.scenarioList}>
             {firstWeekPath.map((lesson, i) => (
               <Animated.View key={lesson.id} entering={FadeInDown.delay(420 + i * 60).duration(400)}>
-                <LessonRow lesson={lesson} colors={colors} />
+                <LessonRow
+                  lesson={lesson}
+                  colors={colors}
+                  completed={completedLessonIds.has(lesson.id)}
+                  onToggleComplete={() =>
+                    completedLessonIds.has(lesson.id) ? markLessonIncomplete(lesson.id) : markLessonComplete(lesson.id)
+                  }
+                />
               </Animated.View>
             ))}
           </View>
@@ -168,7 +197,14 @@ export function TrainingScreen() {
                 .filter((lesson) => !firstWeekPath.some((starter) => starter.id === lesson.id))
                 .map((lesson, i) => (
                   <Animated.View key={lesson.id} entering={FadeInDown.delay(i * 60).duration(350)}>
-                    <LessonRow lesson={lesson} colors={colors} />
+                    <LessonRow
+                      lesson={lesson}
+                      colors={colors}
+                      completed={completedLessonIds.has(lesson.id)}
+                      onToggleComplete={() =>
+                        completedLessonIds.has(lesson.id) ? markLessonIncomplete(lesson.id) : markLessonComplete(lesson.id)
+                      }
+                    />
                   </Animated.View>
                 ))}
             </View>
@@ -176,9 +212,41 @@ export function TrainingScreen() {
 
           <Text style={[type.h2, { color: colors.textPrimary, marginTop: spacing.sm }]}>Book an instructor</Text>
           <Card>
-            <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>Next available slot</Text>
-            <Text style={[type.caption, { color: colors.textMuted }]}>Fri 9:00 AM · site supervisor approval not required</Text>
-            <PrimaryButton label="Request booking" onPress={() => {}} variant="secondary" fullWidth={false} />
+            {booking.status === "done" ? (
+              <>
+                <View style={styles.rowBetween}>
+                  <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>Booking requested</Text>
+                  <Badge label={booking.result.status} tone="info" />
+                </View>
+                <Text style={[type.body, { color: colors.textMuted }]}>{booking.result.reply}</Text>
+                <Text style={[type.caption, { color: colors.textMuted }]}>
+                  {new Date(booking.result.slot_start).toLocaleString()} –{" "}
+                  {new Date(booking.result.slot_end).toLocaleTimeString()}
+                </Text>
+                <PrimaryButton
+                  label="Request another slot"
+                  onPress={requestBooking}
+                  variant="secondary"
+                  fullWidth={false}
+                />
+              </>
+            ) : (
+              <>
+                <Text style={[type.bodyStrong, { color: colors.textPrimary }]}>Request a slot</Text>
+                <Text style={[type.caption, { color: colors.textMuted }]}>
+                  Books the next available instructor slot — needs a connection, same as the assistant&apos;s booking.
+                </Text>
+                {booking.status === "error" ? (
+                  <Text style={[type.caption, { color: colors.danger }]}>{booking.message}</Text>
+                ) : null}
+                <PrimaryButton
+                  label={booking.status === "loading" ? "Requesting…" : "Request booking"}
+                  onPress={requestBooking}
+                  variant="secondary"
+                  fullWidth={false}
+                />
+              </>
+            )}
           </Card>
         </ScrollView>
       </SafeAreaView>
@@ -186,32 +254,83 @@ export function TrainingScreen() {
   );
 }
 
-function LessonRow({ lesson, colors }: { lesson: Lesson; colors: ReturnType<typeof useColors> }) {
+function ProgressStat({ label, value, colors }: { label: string; value: string; colors: ReturnType<typeof useColors> }) {
   return (
-    <Card>
-      <View style={styles.rowBetween}>
-        <Text style={[type.bodyStrong, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
-          {lesson.title}
+    <View style={styles.progressCell}>
+      <Text style={[type.h2, { color: colors.textPrimary }]}>{value}</Text>
+      <Text style={[type.caption, { color: colors.textMuted }]}>{label}</Text>
+    </View>
+  );
+}
+
+function LessonRow({
+  lesson,
+  colors,
+  completed,
+  onToggleComplete,
+}: {
+  lesson: Lesson;
+  colors: ReturnType<typeof useColors>;
+  completed: boolean;
+  onToggleComplete: () => void;
+}) {
+  return (
+    <Card accentColor={completed ? colors.safe : undefined}>
+      <Pressable
+        onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: lesson.id } })}
+        style={{ gap: spacing.sm }}
+      >
+        <View style={styles.rowBetween}>
+          <Text style={[type.bodyStrong, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
+            {lesson.title}
+          </Text>
+          <Badge label={lesson.category} tone={categoryTone[lesson.category]} />
+        </View>
+        <Text style={[type.body, { color: colors.textMuted }]} numberOfLines={2}>
+          {lesson.summary}
         </Text>
-        <Badge label={lesson.category} tone={categoryTone[lesson.category]} />
-      </View>
-      <Text style={[type.body, { color: colors.textMuted }]} numberOfLines={2}>
-        {lesson.summary}
-      </Text>
-      <View style={styles.objectiveBox}>
-        <Text style={[type.caption, { color: colors.textMuted }]}>YOU WILL LEARN</Text>
-        <Text style={[type.caption, { color: colors.textPrimary }]}>{lesson.objective}</Text>
-      </View>
-      <Text style={[type.caption, { color: colors.textMuted }]} numberOfLines={2}>
-        Key steps: {lesson.keySteps.slice(0, 2).join(" · ")}
-      </Text>
-      <View style={styles.rowBetween}>
-        <Text style={[type.caption, { color: colors.textMuted }]}>
-          {lesson.durationMin} min · {lesson.languages.join("/")}
-          {lesson.standardRef ? ` · ${lesson.standardRef}` : ""}
+        <View style={styles.objectiveBox}>
+          <Text style={[type.caption, { color: colors.textMuted }]}>YOU WILL LEARN</Text>
+          <Text style={[type.caption, { color: colors.textPrimary }]}>{lesson.objective}</Text>
+        </View>
+        <Text style={[type.caption, { color: colors.textMuted }]} numberOfLines={2}>
+          Key steps: {lesson.keySteps.slice(0, 2).join(" · ")}
         </Text>
-        {lesson.downloadedOffline ? <Badge label="Downloaded" tone="safe" /> : null}
-      </View>
+        <View style={styles.rowBetween}>
+          <Text style={[type.caption, { color: colors.textMuted }]}>
+            {lesson.durationMin} min · {lesson.languages.join("/")}
+            {lesson.standardRef ? ` · ${lesson.standardRef}` : ""}
+          </Text>
+          <View style={styles.rowBetween}>
+            {/* A handful of lessons now have a real embedded video (see
+                trainingLibrary.ts) — this reflects which, honestly, per lesson. */}
+            <Badge label={lesson.videoUri ? "Video" : "Text lesson"} tone="neutral" />
+            {lesson.downloadedOffline ? <Badge label="Downloaded" tone="safe" /> : null}
+          </View>
+        </View>
+      </Pressable>
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync();
+          onToggleComplete();
+        }}
+        style={[
+          styles.completeRow,
+          { borderColor: completed ? colors.safe : colors.border, backgroundColor: completed ? `${colors.safe}17` : "transparent" },
+        ]}
+      >
+        <View
+          style={[
+            styles.completeCheckbox,
+            { borderColor: completed ? colors.safe : colors.border, backgroundColor: completed ? colors.safe : "transparent" },
+          ]}
+        >
+          {completed ? <CheckIcon color={colors.mode === "light" ? "#FFFFFF" : colors.bg} size={14} /> : null}
+        </View>
+        <Text style={[type.caption, { color: completed ? colors.safe : colors.textSecondary, fontWeight: "700" }]}>
+          {completed ? "Completed" : "Mark as complete"}
+        </Text>
+      </Pressable>
     </Card>
   );
 }
@@ -225,22 +344,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl + 72,
     gap: spacing.md,
   },
-  heroCard: {
-    gap: spacing.sm,
-  },
-  heroTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  heroPreview: {
-    flex: 1,
-    height: 100,
-    borderRadius: radius.md,
-    backgroundColor: "rgba(0,0,0,0.06)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -252,5 +355,32 @@ const styles = StyleSheet.create({
   },
   objectiveBox: {
     gap: 2,
+  },
+  progressGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+  },
+  progressCell: {
+    minWidth: "40%",
+    flexGrow: 1,
+    gap: 2,
+  },
+  completeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    minHeight: touchTarget,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+  },
+  completeCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
